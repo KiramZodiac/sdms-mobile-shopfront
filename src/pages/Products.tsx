@@ -47,7 +47,7 @@ const Products = () => {
   const { addToCart } = useCart();
   const { toast } = useToast();
 
-  const category = searchParams.get('category') || '';
+  const category = searchParams.get('category') || 'all';
   const sortBy = searchParams.get('sort') || 'newest';
   const page = parseInt(searchParams.get('page') || '1');
 
@@ -70,7 +70,7 @@ const Products = () => {
 
       if (error) throw error;
       
-      const allCategories = [{ id: '', name: 'All Categories', slug: '' }, ...(data || [])];
+      const allCategories = [{ id: 'all', name: 'All Categories', slug: 'all' }, ...(data || [])];
       setCategories(allCategories);
     } catch (error) {
       console.error('Error fetching categories:', error);
@@ -105,8 +105,8 @@ const Products = () => {
         `, { count: 'exact' })
         .eq('is_active', true);
 
-      // Apply category filter
-      if (category) {
+      // Apply category filter - skip if 'all' is selected
+      if (category && category !== 'all') {
         query = query.eq('categories.slug', category);
       }
 
@@ -305,7 +305,7 @@ const Products = () => {
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-4">
-          {category ? categories.find(c => c.slug === category)?.name || 'Products' : 'All Products'}
+          {category && category !== 'all' ? categories.find(c => c.slug === category)?.name || 'Products' : 'All Products'}
         </h1>
         <p className="text-gray-600">
           {totalProducts} product{totalProducts !== 1 ? 's' : ''} found
@@ -322,7 +322,7 @@ const Products = () => {
               value={category}
               onValueChange={(value) => {
                 const params = new URLSearchParams(searchParams);
-                if (value) {
+                if (value && value !== 'all') {
                   params.set('category', value);
                 } else {
                   params.delete('category');
@@ -336,7 +336,7 @@ const Products = () => {
               </SelectTrigger>
               <SelectContent>
                 {categories.map((cat) => (
-                  <SelectItem key={cat.id || 'all'} value={cat.slug}>
+                  <SelectItem key={cat.id} value={cat.slug}>
                     {cat.name}
                   </SelectItem>
                 ))}
