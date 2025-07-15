@@ -6,7 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious, PaginationEllipsis } from "@/components/ui/pagination";
 import { useCart } from "@/hooks/useCart";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 interface Product {
   id: string;
@@ -14,149 +17,162 @@ interface Product {
   price: number;
   original_price?: number;
   description: string;
+  short_description?: string;
   images: string[];
   category: string;
   stock_quantity: number;
   rating?: number;
   reviews_count?: number;
+  slug: string;
+  sku?: string;
 }
+
+interface Category {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+const PRODUCTS_PER_PAGE = 12;
 
 const Products = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [products, setProducts] = useState<Product[]>([]);
-  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [priceRange, setPriceRange] = useState({ min: '', max: '' });
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalProducts, setTotalProducts] = useState(0);
   const { addToCart } = useCart();
+  const { toast } = useToast();
 
   const category = searchParams.get('category') || '';
   const sortBy = searchParams.get('sort') || 'newest';
+  const page = parseInt(searchParams.get('page') || '1');
 
   useEffect(() => {
+    setCurrentPage(page);
+  }, [page]);
+
+  useEffect(() => {
+    fetchCategories();
     fetchProducts();
-  }, []);
+  }, [category, sortBy, priceRange, currentPage]);
 
-  useEffect(() => {
-    filterAndSortProducts();
-  }, [products, category, sortBy, priceRange]);
-
-  const fetchProducts = async () => {
+  const fetchCategories = async () => {
     try {
-      // Mock data for now
-      const mockProducts: Product[] = [
-        {
-          id: "1",
-          name: "iPhone 15 Pro Max",
-          price: 1200000,
-          original_price: 1350000,
-          description: "Latest iPhone with A17 Pro chip and titanium design",
-          images: ["https://images.unsplash.com/photo-1556656793-08538906a9f8?w=400"],
-          category: "smartphones",
-          stock_quantity: 15,
-          rating: 4.8,
-          reviews_count: 124
-        },
-        {
-          id: "2",
-          name: "Samsung Galaxy S24 Ultra",
-          price: 1100000,
-          description: "Premium Android phone with S Pen",
-          images: ["https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=400"],
-          category: "smartphones",
-          stock_quantity: 12,
-          rating: 4.7,
-          reviews_count: 98
-        },
-        {
-          id: "3",
-          name: "MacBook Pro 14\"",
-          price: 2500000,
-          description: "Powerful laptop with M3 chip",
-          images: ["https://images.unsplash.com/photo-1496181133206-80ce9b88a853?w=400"],
-          category: "laptops",
-          stock_quantity: 8,
-          rating: 4.9,
-          reviews_count: 89
-        },
-        {
-          id: "4",
-          name: "Dell XPS 13",
-          price: 1800000,
-          description: "Ultra-portable Windows laptop",
-          images: ["https://images.unsplash.com/photo-1593642702821-c8da6771f0c6?w=400"],
-          category: "laptops",
-          stock_quantity: 6,
-          rating: 4.5,
-          reviews_count: 67
-        },
-        {
-          id: "5",
-          name: "Sony WH-1000XM5",
-          price: 450000,
-          original_price: 520000,
-          description: "Premium noise-canceling headphones",
-          images: ["https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400"],
-          category: "audio",
-          stock_quantity: 25,
-          rating: 4.7,
-          reviews_count: 203
-        },
-        {
-          id: "6",
-          name: "AirPods Pro 2",
-          price: 350000,
-          description: "Active noise canceling earbuds",
-          images: ["https://images.unsplash.com/photo-1572569511254-d8f925fe2cbb?w=400"],
-          category: "audio",
-          stock_quantity: 30,
-          rating: 4.6,
-          reviews_count: 145
-        }
-      ];
+      const { data, error } = await supabase
+        .from('categories')
+        .select('id, name, slug')
+        .eq('is_active', true)
+        .order('name');
 
-      setProducts(mockProducts);
+      if (error) throw error;
+      
+      const allCategories = [{ id: '', name: 'All Categories', slug: '' }, ...(data || [])];
+      setCategories(allCategories);
     } catch (error) {
-      console.error('Error fetching products:', error);
-    } finally {
-      setLoading(false);
+      console.error('Error fetching categories:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load categories",
+        variant: "destructive",
+      });
     }
   };
 
-  const filterAndSortProducts = () => {
-    let filtered = [...products];
+  const fetchProducts = async () => {
+    try {
+      setLoading(true);
+      
+      let query = supabase
+        .from('products')
+        .select(`
+          id,
+          name,
+          price,
+          original_price,
+          description,
+          short_description,
+          images,
+          stock_quantity,
+          rating,
+          reviews_count,
+          slug,
+          sku,
+          categories!inner(name, slug)
+        `, { count: 'exact' })
+        .eq('is_active', true);
 
-    // Filter by category
-    if (category) {
-      filtered = filtered.filter(product => product.category === category);
-    }
+      // Apply category filter
+      if (category) {
+        query = query.eq('categories.slug', category);
+      }
 
-    // Filter by price range
-    if (priceRange.min) {
-      filtered = filtered.filter(product => product.price >= parseInt(priceRange.min));
-    }
-    if (priceRange.max) {
-      filtered = filtered.filter(product => product.price <= parseInt(priceRange.max));
-    }
+      // Apply price range filters
+      if (priceRange.min) {
+        query = query.gte('price', parseInt(priceRange.min));
+      }
+      if (priceRange.max) {
+        query = query.lte('price', parseInt(priceRange.max));
+      }
 
-    // Sort products
-    switch (sortBy) {
-      case 'price-low':
-        filtered.sort((a, b) => a.price - b.price);
-        break;
-      case 'price-high':
-        filtered.sort((a, b) => b.price - a.price);
-        break;
-      case 'rating':
-        filtered.sort((a, b) => (b.rating || 0) - (a.rating || 0));
-        break;
-      case 'newest':
-      default:
-        // Already in newest order
-        break;
-    }
+      // Apply sorting
+      switch (sortBy) {
+        case 'price-low':
+          query = query.order('price', { ascending: true });
+          break;
+        case 'price-high':
+          query = query.order('price', { ascending: false });
+          break;
+        case 'rating':
+          query = query.order('rating', { ascending: false });
+          break;
+        case 'newest':
+        default:
+          query = query.order('created_at', { ascending: false });
+          break;
+      }
 
-    setFilteredProducts(filtered);
+      // Apply pagination
+      const from = (currentPage - 1) * PRODUCTS_PER_PAGE;
+      const to = from + PRODUCTS_PER_PAGE - 1;
+      query = query.range(from, to);
+
+      const { data, error, count } = await query;
+
+      if (error) throw error;
+
+      // Transform data to match our interface
+      const transformedProducts = data?.map((product: any) => ({
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        original_price: product.original_price,
+        description: product.description || product.short_description || '',
+        short_description: product.short_description,
+        images: product.images || [],
+        category: product.categories?.slug || '',
+        stock_quantity: product.stock_quantity || 0,
+        rating: product.rating,
+        reviews_count: product.reviews_count,
+        slug: product.slug,
+        sku: product.sku
+      })) || [];
+
+      setProducts(transformedProducts);
+      setTotalProducts(count || 0);
+    } catch (error) {
+      console.error('Error fetching products:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load products",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const formatPrice = (price: number) => {
@@ -172,19 +188,98 @@ const Products = () => {
       id: product.id,
       name: product.name,
       price: product.price,
-      image: product.images[0]
+      image: product.images[0] || '/placeholder.svg'
     });
   };
 
-  const categories = [
-    { id: '', name: 'All Categories' },
-    { id: 'smartphones', name: 'Smartphones' },
-    { id: 'laptops', name: 'Laptops' },
-    { id: 'audio', name: 'Audio Devices' },
-    { id: 'wearables', name: 'Wearables' },
-    { id: 'cameras', name: 'Cameras' },
-    { id: 'gaming', name: 'Gaming' }
-  ];
+  const handlePageChange = (newPage: number) => {
+    const params = new URLSearchParams(searchParams);
+    params.set('page', newPage.toString());
+    setSearchParams(params);
+  };
+
+  const totalPages = Math.ceil(totalProducts / PRODUCTS_PER_PAGE);
+
+  const renderPaginationItems = () => {
+    const items = [];
+    const maxVisiblePages = 5;
+
+    if (totalPages <= maxVisiblePages) {
+      for (let i = 1; i <= totalPages; i++) {
+        items.push(
+          <PaginationItem key={i}>
+            <PaginationLink
+              onClick={() => handlePageChange(i)}
+              isActive={currentPage === i}
+              className="cursor-pointer"
+            >
+              {i}
+            </PaginationLink>
+          </PaginationItem>
+        );
+      }
+    } else {
+      // Show first page
+      items.push(
+        <PaginationItem key={1}>
+          <PaginationLink
+            onClick={() => handlePageChange(1)}
+            isActive={currentPage === 1}
+            className="cursor-pointer"
+          >
+            1
+          </PaginationLink>
+        </PaginationItem>
+      );
+
+      // Show ellipsis if needed
+      if (currentPage > 3) {
+        items.push(<PaginationEllipsis key="ellipsis1" />);
+      }
+
+      // Show pages around current page
+      const start = Math.max(2, currentPage - 1);
+      const end = Math.min(totalPages - 1, currentPage + 1);
+
+      for (let i = start; i <= end; i++) {
+        if (i !== 1 && i !== totalPages) {
+          items.push(
+            <PaginationItem key={i}>
+              <PaginationLink
+                onClick={() => handlePageChange(i)}
+                isActive={currentPage === i}
+                className="cursor-pointer"
+              >
+                {i}
+              </PaginationLink>
+            </PaginationItem>
+          );
+        }
+      }
+
+      // Show ellipsis if needed
+      if (currentPage < totalPages - 2) {
+        items.push(<PaginationEllipsis key="ellipsis2" />);
+      }
+
+      // Show last page
+      if (totalPages > 1) {
+        items.push(
+          <PaginationItem key={totalPages}>
+            <PaginationLink
+              onClick={() => handlePageChange(totalPages)}
+              isActive={currentPage === totalPages}
+              className="cursor-pointer"
+            >
+              {totalPages}
+            </PaginationLink>
+          </PaginationItem>
+        );
+      }
+    }
+
+    return items;
+  };
 
   if (loading) {
     return (
@@ -210,10 +305,10 @@ const Products = () => {
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-4">
-          {category ? categories.find(c => c.id === category)?.name || 'Products' : 'All Products'}
+          {category ? categories.find(c => c.slug === category)?.name || 'Products' : 'All Products'}
         </h1>
         <p className="text-gray-600">
-          {filteredProducts.length} product{filteredProducts.length !== 1 ? 's' : ''} found
+          {totalProducts} product{totalProducts !== 1 ? 's' : ''} found
         </p>
       </div>
 
@@ -232,6 +327,7 @@ const Products = () => {
                 } else {
                   params.delete('category');
                 }
+                params.delete('page'); // Reset to first page when filtering
                 setSearchParams(params);
               }}
             >
@@ -240,7 +336,7 @@ const Products = () => {
               </SelectTrigger>
               <SelectContent>
                 {categories.map((cat) => (
-                  <SelectItem key={cat.id} value={cat.id}>
+                  <SelectItem key={cat.id || 'all'} value={cat.slug}>
                     {cat.name}
                   </SelectItem>
                 ))}
@@ -278,6 +374,7 @@ const Products = () => {
                 onValueChange={(value) => {
                   const params = new URLSearchParams(searchParams);
                   params.set('sort', value);
+                  params.delete('page'); // Reset to first page when sorting
                   setSearchParams(params);
                 }}
               >
@@ -317,7 +414,7 @@ const Products = () => {
               ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6" 
               : "space-y-4"
           }>
-            {filteredProducts.map((product) => (
+            {products.map((product) => (
               <div
                 key={product.id}
                 className={`bg-white rounded-lg shadow-sm hover:shadow-lg transition-shadow duration-300 group ${
@@ -329,7 +426,7 @@ const Products = () => {
                   viewMode === 'list' ? 'w-32 h-32 rounded-lg flex-shrink-0' : 'aspect-square rounded-t-lg'
                 }`}>
                   <img
-                    src={product.images[0]}
+                    src={product.images[0] || '/placeholder.svg'}
                     alt={product.name}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />
@@ -346,14 +443,14 @@ const Products = () => {
 
                 {/* Product Info */}
                 <div className={viewMode === 'list' ? 'flex-1' : 'p-4'}>
-                  <Link to={`/products/${product.id}`}>
+                  <Link to={`/products/${product.slug}`}>
                     <h3 className="font-semibold text-gray-900 hover:text-blue-600 transition-colors mb-2">
                       {product.name}
                     </h3>
                   </Link>
                   
                   <p className="text-sm text-gray-600 mb-2 line-clamp-2">
-                    {product.description}
+                    {product.short_description || product.description}
                   </p>
 
                   {/* Rating */}
@@ -426,8 +523,33 @@ const Products = () => {
             ))}
           </div>
 
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="mt-8">
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious 
+                      onClick={() => currentPage > 1 && handlePageChange(currentPage - 1)}
+                      className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                    />
+                  </PaginationItem>
+                  
+                  {renderPaginationItems()}
+                  
+                  <PaginationItem>
+                    <PaginationNext 
+                      onClick={() => currentPage < totalPages && handlePageChange(currentPage + 1)}
+                      className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          )}
+
           {/* Empty State */}
-          {filteredProducts.length === 0 && (
+          {products.length === 0 && !loading && (
             <div className="text-center py-12">
               <div className="text-gray-400 mb-4">
                 <Filter className="w-12 h-12 mx-auto" />
