@@ -9,6 +9,7 @@ import { AdminAuthProvider } from "@/hooks/useAdminAuth";
 import { Layout } from "@/components/Layout";
 import Index from "./pages/Index";
 import Products from "./pages/Products";
+import Checkout from "./pages/Checkout";
 import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
 
@@ -26,6 +27,7 @@ const App = () => (
               <Route path="/" element={<Layout />}>
                 <Route index element={<Index />} />
                 <Route path="products" element={<Products />} />
+                <Route path="checkout" element={<Checkout />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Route>

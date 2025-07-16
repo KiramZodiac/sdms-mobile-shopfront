@@ -267,6 +267,7 @@ export type Database = {
           specifications: Json | null
           stock_quantity: number | null
           updated_at: string | null
+          view_count: number | null
         }
         Insert: {
           category_id?: string | null
@@ -288,6 +289,7 @@ export type Database = {
           specifications?: Json | null
           stock_quantity?: number | null
           updated_at?: string | null
+          view_count?: number | null
         }
         Update: {
           category_id?: string | null
@@ -309,6 +311,7 @@ export type Database = {
           specifications?: Json | null
           stock_quantity?: number | null
           updated_at?: string | null
+          view_count?: number | null
         }
         Relationships: [
           {
@@ -320,6 +323,33 @@ export type Database = {
           },
         ]
       }
+      shipping_rates: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          name: string
+          rate: number
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          rate: number
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          rate?: number
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -328,6 +358,10 @@ export type Database = {
       generate_order_number: {
         Args: Record<PropertyKey, never>
         Returns: string
+      }
+      increment_product_view: {
+        Args: { product_id: string }
+        Returns: undefined
       }
     }
     Enums: {
