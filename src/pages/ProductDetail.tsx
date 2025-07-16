@@ -61,7 +61,6 @@ export default function ProductDetail() {
       
       if (data) {
         setProduct(data);
-        // Increment view count
         await supabase.rpc('increment_product_view', { product_id: data.id });
       }
     } catch (error) {
@@ -137,7 +136,6 @@ export default function ProductDetail() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      {/* Back Button */}
       <Button
         variant="ghost"
         onClick={() => navigate(-1)}
@@ -148,7 +146,6 @@ export default function ProductDetail() {
       </Button>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Product Images */}
         <div className="space-y-4">
           <div className="aspect-square overflow-hidden rounded-lg bg-gray-100">
             <img
@@ -179,9 +176,7 @@ export default function ProductDetail() {
           )}
         </div>
 
-        {/* Product Info */}
         <div className="space-y-6">
-          {/* Title and Category */}
           <div>
             {product.categories && (
               <Badge variant="outline" className="mb-2">
@@ -194,7 +189,6 @@ export default function ProductDetail() {
             )}
           </div>
 
-          {/* Rating */}
           {product.rating && (
             <div className="flex items-center gap-2">
               <div className="flex">
@@ -215,7 +209,6 @@ export default function ProductDetail() {
             </div>
           )}
 
-          {/* Price */}
           <div className="space-y-2">
             <div className="flex items-center gap-4">
               <span className="text-3xl font-bold text-blue-600">
@@ -234,7 +227,6 @@ export default function ProductDetail() {
             </div>
           </div>
 
-          {/* Stock Status */}
           <div>
             {product.stock_quantity > 0 ? (
               <div className="flex items-center gap-2">
@@ -254,7 +246,6 @@ export default function ProductDetail() {
             )}
           </div>
 
-          {/* Description */}
           <div>
             <h3 className="text-lg font-semibold mb-2">Description</h3>
             <p className="text-gray-600 leading-relaxed">
@@ -262,7 +253,6 @@ export default function ProductDetail() {
             </p>
           </div>
 
-          {/* Features */}
           {product.features && product.features.length > 0 && (
             <div>
               <h3 className="text-lg font-semibold mb-2">Features</h3>
@@ -274,7 +264,6 @@ export default function ProductDetail() {
             </div>
           )}
 
-          {/* Add to Cart */}
           <div className="flex gap-4">
             <Button
               onClick={handleAddToCart}
@@ -301,7 +290,6 @@ export default function ProductDetail() {
         </div>
       </div>
 
-      {/* Specifications */}
       {product.specifications && Object.keys(product.specifications).length > 0 && (
         <Card className="mt-8">
           <CardContent className="p-6">

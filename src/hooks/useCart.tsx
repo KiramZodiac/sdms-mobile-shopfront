@@ -12,7 +12,6 @@ interface CartItem {
 
 interface CartContextType {
   items: CartItem[];
-  addItem: (item: Omit<CartItem, 'quantity'>) => void;
   addToCart: (item: Omit<CartItem, 'quantity'>) => void;
   removeItem: (id: string) => void;
   updateQuantity: (id: string, quantity: number) => void;
@@ -27,7 +26,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
   const [items, setItems] = useState<CartItem[]>([]);
   const { toast } = useToast();
 
-  const addItem = (newItem: Omit<CartItem, 'quantity'>) => {
+  const addToCart = (newItem: Omit<CartItem, 'quantity'>) => {
     setItems(prev => {
       const existingItem = prev.find(item => item.id === newItem.id);
       if (existingItem) {
@@ -50,13 +49,19 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
-  const addToCart = addItem;
-
   const removeItem = (id: string) => {
-    setItems(prev => prev.filter(item => item.id !== id));
-    toast({
-      title: "Item Removed",
-      description: "Item has been removed from your cart",
+    setItems(prev => {
+      const itemToRemove = prev.find(item => item.id === id);
+      const newItems = prev.filter(item => item.id !== id);
+      
+      if (itemToRemove) {
+        toast({
+          title: "Item Removed",
+          description: `${itemToRemove.name} has been removed from your cart`,
+        });
+      }
+      
+      return newItems;
     });
   };
 
@@ -65,6 +70,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
       removeItem(id);
       return;
     }
+    
     setItems(prev =>
       prev.map(item =>
         item.id === id ? { ...item, quantity } : item
@@ -86,7 +92,6 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
   return (
     <CartContext.Provider value={{
       items,
-      addItem,
       addToCart,
       removeItem,
       updateQuantity,

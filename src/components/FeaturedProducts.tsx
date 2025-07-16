@@ -156,7 +156,6 @@ export const FeaturedProducts = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {products.map((product) => (
             <div key={product.id} className="bg-white rounded-lg shadow-sm hover:shadow-lg transition-shadow duration-300 group">
-              {/* Product Image */}
               <div className="relative aspect-square overflow-hidden rounded-t-lg">
                 <img
                   src={product.images[0] || '/placeholder.svg'}
@@ -164,7 +163,6 @@ export const FeaturedProducts = () => {
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                 />
                 
-                {/* Badges */}
                 <div className="absolute top-2 left-2 flex flex-col gap-1">
                   {product.original_price && product.original_price > product.price && (
                     <Badge className="bg-red-500 text-white">
@@ -178,7 +176,6 @@ export const FeaturedProducts = () => {
                   )}
                 </div>
 
-                {/* Quick Actions */}
                 <div className="absolute top-2 right-2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   <Link to={`/products/${product.slug}`}>
                     <Button size="sm" variant="secondary" className="w-8 h-8 p-0">
@@ -188,7 +185,6 @@ export const FeaturedProducts = () => {
                 </div>
               </div>
 
-              {/* Product Info */}
               <div className="p-4">
                 <div className="mb-2">
                   <Link to={`/products/${product.slug}`}>
@@ -201,7 +197,6 @@ export const FeaturedProducts = () => {
                   </p>
                 </div>
 
-                {/* Rating */}
                 {product.rating && (
                   <div className="flex items-center gap-1 mb-2">
                     <div className="flex">
@@ -222,7 +217,6 @@ export const FeaturedProducts = () => {
                   </div>
                 )}
 
-                {/* Price */}
                 <div className="mb-3">
                   <div className="flex items-center gap-2">
                     <span className="text-lg font-bold text-blue-600">
@@ -236,7 +230,6 @@ export const FeaturedProducts = () => {
                   </div>
                 </div>
 
-                {/* Add to Cart Button */}
                 <Button
                   onClick={() => handleAddToCart(product)}
                   className="w-full bg-orange-500 hover:bg-orange-600 text-white"
@@ -257,7 +250,6 @@ export const FeaturedProducts = () => {
           ))}
         </div>
 
-        {/* View All Products Link */}
         <div className="text-center mt-8">
           <Link to="/products">
             <Button variant="outline" size="lg">
