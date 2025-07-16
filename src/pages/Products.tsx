@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { Filter, Grid, List, Star, ShoppingCart } from "lucide-react";
@@ -105,10 +104,12 @@ const Products = () => {
         `, { count: 'exact' })
         .eq('is_active', true);
 
+      // Apply category filter - skip if 'all' is selected
       if (category && category !== 'all') {
         query = query.eq('categories.slug', category);
       }
 
+      // Apply price range filters
       if (priceRange.min) {
         query = query.gte('price', parseInt(priceRange.min));
       }
@@ -116,6 +117,7 @@ const Products = () => {
         query = query.lte('price', parseInt(priceRange.max));
       }
 
+      // Apply sorting
       switch (sortBy) {
         case 'price-low':
           query = query.order('price', { ascending: true });
@@ -132,6 +134,7 @@ const Products = () => {
           break;
       }
 
+      // Apply pagination
       const from = (currentPage - 1) * PRODUCTS_PER_PAGE;
       const to = from + PRODUCTS_PER_PAGE - 1;
       query = query.range(from, to);
@@ -140,6 +143,7 @@ const Products = () => {
 
       if (error) throw error;
 
+      // Transform data to match our interface
       const transformedProducts = data?.map((product: any) => ({
         id: product.id,
         name: product.name,
@@ -214,6 +218,7 @@ const Products = () => {
         );
       }
     } else {
+      // Show first page
       items.push(
         <PaginationItem key={1}>
           <PaginationLink
@@ -226,10 +231,12 @@ const Products = () => {
         </PaginationItem>
       );
 
+      // Show ellipsis if needed
       if (currentPage > 3) {
         items.push(<PaginationEllipsis key="ellipsis1" />);
       }
 
+      // Show pages around current page
       const start = Math.max(2, currentPage - 1);
       const end = Math.min(totalPages - 1, currentPage + 1);
 
@@ -249,10 +256,12 @@ const Products = () => {
         }
       }
 
+      // Show ellipsis if needed
       if (currentPage < totalPages - 2) {
         items.push(<PaginationEllipsis key="ellipsis2" />);
       }
 
+      // Show last page
       if (totalPages > 1) {
         items.push(
           <PaginationItem key={totalPages}>
@@ -292,6 +301,7 @@ const Products = () => {
 
   return (
     <div className="container mx-auto px-4 py-8">
+      {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-4">
           {category && category !== 'all' ? categories.find(c => c.slug === category)?.name || 'Products' : 'All Products'}
@@ -302,7 +312,9 @@ const Products = () => {
       </div>
 
       <div className="flex flex-col lg:flex-row gap-8">
+        {/* Filters Sidebar */}
         <div className="lg:w-64 space-y-6">
+          {/* Category Filter */}
           <div>
             <h3 className="font-semibold text-gray-900 mb-3">Category</h3>
             <Select
@@ -314,7 +326,7 @@ const Products = () => {
                 } else {
                   params.delete('category');
                 }
-                params.delete('page');
+                params.delete('page'); // Reset to first page when filtering
                 setSearchParams(params);
               }}
             >
@@ -331,6 +343,7 @@ const Products = () => {
             </Select>
           </div>
 
+          {/* Price Range Filter */}
           <div>
             <h3 className="font-semibold text-gray-900 mb-3">Price Range</h3>
             <div className="space-y-2">
@@ -350,7 +363,9 @@ const Products = () => {
           </div>
         </div>
 
+        {/* Main Content */}
         <div className="flex-1">
+          {/* Toolbar */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
             <div className="flex items-center gap-4">
               <Select
@@ -358,7 +373,7 @@ const Products = () => {
                 onValueChange={(value) => {
                   const params = new URLSearchParams(searchParams);
                   params.set('sort', value);
-                  params.delete('page');
+                  params.delete('page'); // Reset to first page when sorting
                   setSearchParams(params);
                 }}
               >
@@ -392,6 +407,7 @@ const Products = () => {
             </div>
           </div>
 
+          {/* Products Grid/List */}
           <div className={
             viewMode === 'grid' 
               ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6" 
@@ -404,6 +420,7 @@ const Products = () => {
                   viewMode === 'list' ? 'flex gap-4 p-4' : ''
                 }`}
               >
+                {/* Product Image */}
                 <div className={`relative overflow-hidden ${
                   viewMode === 'list' ? 'w-32 h-32 rounded-lg flex-shrink-0' : 'aspect-square rounded-t-lg'
                 }`}>
@@ -413,6 +430,7 @@ const Products = () => {
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />
                   
+                  {/* Badges */}
                   <div className="absolute top-2 left-2 flex flex-col gap-1">
                     {product.original_price && product.original_price > product.price && (
                       <Badge className="bg-red-500 text-white text-xs">
@@ -422,6 +440,7 @@ const Products = () => {
                   </div>
                 </div>
 
+                {/* Product Info */}
                 <div className={viewMode === 'list' ? 'flex-1' : 'p-4'}>
                   <Link to={`/products/${product.slug}`}>
                     <h3 className="font-semibold text-gray-900 hover:text-blue-600 transition-colors mb-2">
@@ -433,6 +452,7 @@ const Products = () => {
                     {product.short_description || product.description}
                   </p>
 
+                  {/* Rating */}
                   {product.rating && (
                     <div className="flex items-center gap-1 mb-2">
                       <div className="flex">
@@ -453,6 +473,7 @@ const Products = () => {
                     </div>
                   )}
 
+                  {/* Price */}
                   <div className="mb-3">
                     <div className="flex items-center gap-2">
                       <span className="text-lg font-bold text-blue-600">
@@ -466,6 +487,7 @@ const Products = () => {
                     </div>
                   </div>
 
+                  {/* Stock Status */}
                   <div className="mb-3">
                     {product.stock_quantity > 0 ? (
                       <span className="text-sm text-green-600">
@@ -479,6 +501,7 @@ const Products = () => {
                     )}
                   </div>
 
+                  {/* Add to Cart Button */}
                   <Button
                     onClick={() => handleAddToCart(product)}
                     className="w-full bg-orange-500 hover:bg-orange-600 text-white"
@@ -499,6 +522,7 @@ const Products = () => {
             ))}
           </div>
 
+          {/* Pagination */}
           {totalPages > 1 && (
             <div className="mt-8">
               <Pagination>
@@ -523,6 +547,7 @@ const Products = () => {
             </div>
           )}
 
+          {/* Empty State */}
           {products.length === 0 && !loading && (
             <div className="text-center py-12">
               <div className="text-gray-400 mb-4">

@@ -1,30 +1,83 @@
 
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { useCart } from "@/hooks/useCart";
-import { CartItems } from "@/components/CartItems";
-import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui/badge';
+import { useCart } from '@/hooks/useCart';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import { ArrowLeft, Phone } from 'lucide-react';
 
-const Checkout = () => {
+interface ShippingRate {
+  id: string;
+  name: string;
+  description: string;
+  rate: number;
+}
+
+export default function Checkout() {
   const { items, total, clearCart } = useCart();
+  const navigate = useNavigate();
   const { toast } = useToast();
-  const [loading, setLoading] = useState(false);
+  
   const [customerData, setCustomerData] = useState({
-    firstName: "",
-    lastName: "",
-    phone: "",
-    email: "",
-    address: "",
-    city: "",
-    district: "",
-    notes: ""
+    firstName: '',
+    lastName: '',
+    phone: '',
+    email: '',
+    address: '',
+    city: '',
+    district: '',
   });
+  
+  const [selectedShipping, setSelectedShipping] = useState('');
+  const [shippingRates, setShippingRates] = useState<ShippingRate[]>([]);
+  const [paymentMethod, setPaymentMethod] = useState('whatsapp');
+  const [notes, setNotes] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (items.length === 0) {
+      navigate('/products');
+      return;
+    }
+
+    fetchShippingRates();
+  }, [items.length, navigate]);
+
+  const fetchShippingRates = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('shipping_rates')
+        .select('*')
+        .order('rate');
+
+      if (error) throw error;
+      setShippingRates(data || []);
+      
+      // Select first shipping option by default
+      if (data && data.length > 0) {
+        setSelectedShipping(data[0].id);
+      }
+    } catch (error) {
+      console.error('Error fetching shipping rates:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load shipping options",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const selectedShippingRate = shippingRates.find(rate => rate.id === selectedShipping);
+  const shippingFee = selectedShippingRate?.rate || 0;
+  const orderTotal = total + shippingFee;
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('en-UG', {
@@ -34,73 +87,49 @@ const Checkout = () => {
     }).format(price);
   };
 
-  const handleInputChange = (field: string, value: string) => {
-    setCustomerData(prev => ({ ...prev, [field]: value }));
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (items.length === 0) {
-      toast({
-        title: "Cart Empty",
-        description: "Please add items to your cart before checking out",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!customerData.firstName || !customerData.lastName || !customerData.phone) {
-      toast({
-        title: "Missing Information",
-        description: "Please fill in all required fields",
-        variant: "destructive",
-      });
-      return;
-    }
-
     setLoading(true);
 
     try {
       // Create customer
       const { data: customer, error: customerError } = await supabase
         .from('customers')
-        .insert([{
+        .insert({
           first_name: customerData.firstName,
           last_name: customerData.lastName,
           phone: customerData.phone,
           email: customerData.email || null,
-          address: customerData.address || null,
-          city: customerData.city || null,
-          district: customerData.district || null,
-        }])
+          address: customerData.address,
+          city: customerData.city,
+          district: customerData.district,
+        })
         .select()
         .single();
 
       if (customerError) throw customerError;
 
       // Generate order number
-      const { data: orderNumber, error: orderNumberError } = await supabase
-        .rpc('generate_order_number');
+      const { data: orderNumber } = await supabase.rpc('generate_order_number');
 
-      if (orderNumberError) throw orderNumberError;
+      // Create WhatsApp message
+      const whatsappMessage = generateWhatsAppMessage();
+      const whatsappUrl = `https://wa.me/256701234567?text=${encodeURIComponent(whatsappMessage)}`;
 
       // Create order
-      const shippingFee = 10000; // 10,000 UGX shipping fee
-      const orderTotal = total + shippingFee;
-
       const { data: order, error: orderError } = await supabase
         .from('orders')
-        .insert([{
-          customer_id: customer.id,
+        .insert({
           order_number: orderNumber,
+          customer_id: customer.id,
           subtotal: total,
           shipping_fee: shippingFee,
           total: orderTotal,
-          payment_method: 'whatsapp',
           status: 'pending',
-          notes: customerData.notes || null,
-        }])
+          payment_method: paymentMethod as any,
+          notes,
+          whatsapp_chat_url: whatsappUrl,
+        })
         .select()
         .single();
 
@@ -121,52 +150,23 @@ const Checkout = () => {
 
       if (itemsError) throw itemsError;
 
-      // Generate WhatsApp message
-      const itemsList = items.map(item => 
-        `${item.name} - Qty: ${item.quantity} - ${formatPrice(item.price * item.quantity)}`
-      ).join('\n');
-
-      const message = `New Order: ${orderNumber}
-
-Customer Details:
-Name: ${customerData.firstName} ${customerData.lastName}
-Phone: ${customerData.phone}
-${customerData.email ? `Email: ${customerData.email}` : ''}
-${customerData.address ? `Address: ${customerData.address}` : ''}
-${customerData.city ? `City: ${customerData.city}` : ''}
-${customerData.district ? `District: ${customerData.district}` : ''}
-
-Order Details:
-${itemsList}
-
-Subtotal: ${formatPrice(total)}
-Shipping: ${formatPrice(shippingFee)}
-Total: ${formatPrice(orderTotal)}
-
-${customerData.notes ? `Notes: ${customerData.notes}` : ''}`;
-
-      const whatsappUrl = `https://wa.me/256700000000?text=${encodeURIComponent(message)}`;
-
-      // Update order with WhatsApp URL
-      await supabase
-        .from('orders')
-        .update({ whatsapp_chat_url: whatsappUrl })
-        .eq('id', order.id);
-
-      // Clear cart and redirect to WhatsApp
+      // Clear cart
       clearCart();
-      window.open(whatsappUrl, '_blank');
 
       toast({
-        title: "Order Placed!",
-        description: "Your order has been submitted. You'll be redirected to WhatsApp to complete the payment.",
+        title: "Order placed successfully!",
+        description: "You'll be redirected to WhatsApp to complete your order.",
       });
 
-    } catch (error) {
-      console.error('Checkout error:', error);
+      // Redirect to WhatsApp
+      window.open(whatsappUrl, '_blank');
+      navigate('/');
+
+    } catch (error: any) {
+      console.error('Order creation error:', error);
       toast({
         title: "Error",
-        description: "Failed to place order. Please try again.",
+        description: error.message || "Failed to place order. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -174,32 +174,110 @@ ${customerData.notes ? `Notes: ${customerData.notes}` : ''}`;
     }
   };
 
+  const generateWhatsAppMessage = () => {
+    const orderSummary = items.map(item => 
+      `${item.name} x${item.quantity} - ${formatPrice(item.price * item.quantity)}`
+    ).join('\n');
+
+    return `Hi! I'd like to place an order:
+
+*Customer Details:*
+Name: ${customerData.firstName} ${customerData.lastName}
+Phone: ${customerData.phone}
+${customerData.email ? `Email: ${customerData.email}` : ''}
+Address: ${customerData.address}, ${customerData.city}, ${customerData.district}
+
+*Order Items:*
+${orderSummary}
+
+*Order Summary:*
+Subtotal: ${formatPrice(total)}
+Shipping (${selectedShippingRate?.name}): ${formatPrice(shippingFee)}
+Total: ${formatPrice(orderTotal)}
+
+${notes ? `Notes: ${notes}` : ''}
+
+Please confirm this order. Thank you!`;
+  };
+
+  if (items.length === 0) {
+    return null;
+  }
+
   return (
     <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold text-gray-900 mb-8">Checkout</h1>
-      
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Cart Items */}
-        <div>
-          <h2 className="text-xl font-semibold mb-4">Your Order</h2>
-          <CartItems />
-        </div>
+      <div className="mb-6">
+        <Button
+          variant="ghost"
+          onClick={() => navigate(-1)}
+          className="mb-4"
+        >
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Back
+        </Button>
+        <h1 className="text-3xl font-bold text-gray-900">Checkout</h1>
+      </div>
 
-        {/* Customer Details Form */}
-        <div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Order Summary */}
+        <div className="lg:col-span-1 order-2 lg:order-1">
           <Card>
             <CardHeader>
-              <CardTitle>Customer Details</CardTitle>
+              <CardTitle>Order Summary</CardTitle>
             </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+            <CardContent className="space-y-4">
+              {items.map((item) => (
+                <div key={item.id} className="flex items-center space-x-3">
+                  <img
+                    src={item.images[0] || '/placeholder.svg'}
+                    alt={item.name}
+                    className="w-16 h-16 object-cover rounded"
+                  />
+                  <div className="flex-1">
+                    <h3 className="font-medium">{item.name}</h3>
+                    <p className="text-sm text-gray-500">Qty: {item.quantity}</p>
+                    <p className="font-semibold">{formatPrice(item.price * item.quantity)}</p>
+                  </div>
+                </div>
+              ))}
+              
+              <Separator />
+              
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span>Subtotal</span>
+                  <span>{formatPrice(total)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Shipping</span>
+                  <span>{formatPrice(shippingFee)}</span>
+                </div>
+                <Separator />
+                <div className="flex justify-between font-bold text-lg">
+                  <span>Total</span>
+                  <span>{formatPrice(orderTotal)}</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Checkout Form */}
+        <div className="lg:col-span-2 order-1 lg:order-2">
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Customer Information */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Contact Information</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="firstName">First Name *</Label>
                     <Input
                       id="firstName"
                       value={customerData.firstName}
-                      onChange={(e) => handleInputChange('firstName', e.target.value)}
+                      onChange={(e) => setCustomerData(prev => ({ ...prev, firstName: e.target.value }))}
                       required
                     />
                   </div>
@@ -208,101 +286,165 @@ ${customerData.notes ? `Notes: ${customerData.notes}` : ''}`;
                     <Input
                       id="lastName"
                       value={customerData.lastName}
-                      onChange={(e) => handleInputChange('lastName', e.target.value)}
+                      onChange={(e) => setCustomerData(prev => ({ ...prev, lastName: e.target.value }))}
                       required
                     />
                   </div>
                 </div>
-
+                
                 <div>
                   <Label htmlFor="phone">Phone Number *</Label>
                   <Input
                     id="phone"
                     type="tel"
+                    placeholder="256701234567"
                     value={customerData.phone}
-                    onChange={(e) => handleInputChange('phone', e.target.value)}
-                    placeholder="e.g., +256700000000"
+                    onChange={(e) => setCustomerData(prev => ({ ...prev, phone: e.target.value }))}
                     required
                   />
                 </div>
-
+                
                 <div>
                   <Label htmlFor="email">Email (Optional)</Label>
                   <Input
                     id="email"
                     type="email"
                     value={customerData.email}
-                    onChange={(e) => handleInputChange('email', e.target.value)}
+                    onChange={(e) => setCustomerData(prev => ({ ...prev, email: e.target.value }))}
                   />
                 </div>
+              </CardContent>
+            </Card>
 
+            {/* Shipping Address */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Shipping Address</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
                 <div>
-                  <Label htmlFor="address">Address (Optional)</Label>
+                  <Label htmlFor="address">Street Address *</Label>
                   <Input
                     id="address"
                     value={customerData.address}
-                    onChange={(e) => handleInputChange('address', e.target.value)}
+                    onChange={(e) => setCustomerData(prev => ({ ...prev, address: e.target.value }))}
+                    required
                   />
                 </div>
-
-                <div className="grid grid-cols-2 gap-4">
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="city">City (Optional)</Label>
+                    <Label htmlFor="city">City *</Label>
                     <Input
                       id="city"
                       value={customerData.city}
-                      onChange={(e) => handleInputChange('city', e.target.value)}
+                      onChange={(e) => setCustomerData(prev => ({ ...prev, city: e.target.value }))}
+                      required
                     />
                   </div>
                   <div>
-                    <Label htmlFor="district">District (Optional)</Label>
+                    <Label htmlFor="district">District *</Label>
                     <Input
                       id="district"
                       value={customerData.district}
-                      onChange={(e) => handleInputChange('district', e.target.value)}
+                      onChange={(e) => setCustomerData(prev => ({ ...prev, district: e.target.value }))}
+                      required
                     />
                   </div>
                 </div>
+              </CardContent>
+            </Card>
 
-                <div>
-                  <Label htmlFor="notes">Order Notes (Optional)</Label>
-                  <Textarea
-                    id="notes"
-                    value={customerData.notes}
-                    onChange={(e) => handleInputChange('notes', e.target.value)}
-                    placeholder="Any special instructions..."
-                  />
-                </div>
+            {/* Shipping Options */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Shipping Options</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <RadioGroup value={selectedShipping} onValueChange={setSelectedShipping}>
+                  {shippingRates.map((rate) => (
+                    <div key={rate.id} className="flex items-center space-x-2 p-3 border rounded-lg">
+                      <RadioGroupItem value={rate.id} id={rate.id} />
+                      <Label htmlFor={rate.id} className="flex-1 cursor-pointer">
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <p className="font-medium">{rate.name}</p>
+                            <p className="text-sm text-gray-500">{rate.description}</p>
+                          </div>
+                          <span className="font-semibold">{formatPrice(rate.rate)}</span>
+                        </div>
+                      </Label>
+                    </div>
+                  ))}
+                </RadioGroup>
+              </CardContent>
+            </Card>
 
-                <div className="pt-4 border-t">
-                  <div className="flex justify-between items-center mb-2">
-                    <span>Subtotal:</span>
-                    <span>{formatPrice(total)}</span>
+            {/* Payment Method */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Payment Method</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <RadioGroup value={paymentMethod} onValueChange={setPaymentMethod}>
+                  <div className="flex items-center space-x-2 p-3 border rounded-lg">
+                    <RadioGroupItem value="whatsapp" id="whatsapp" />
+                    <Label htmlFor="whatsapp" className="flex-1 cursor-pointer">
+                      <div className="flex items-center space-x-2">
+                        <Phone className="w-4 h-4 text-green-600" />
+                        <span>WhatsApp Order (Recommended)</span>
+                        <Badge variant="secondary">Most Popular</Badge>
+                      </div>
+                      <p className="text-sm text-gray-500 mt-1">
+                        Complete your order via WhatsApp for fastest processing
+                      </p>
+                    </Label>
                   </div>
-                  <div className="flex justify-between items-center mb-2">
-                    <span>Shipping:</span>
-                    <span>{formatPrice(10000)}</span>
+                  
+                  <div className="flex items-center space-x-2 p-3 border rounded-lg opacity-50">
+                    <RadioGroupItem value="cash_on_delivery" id="cash_on_delivery" disabled />
+                    <Label htmlFor="cash_on_delivery" className="flex-1">
+                      <span>Cash on Delivery</span>
+                      <Badge variant="outline" className="ml-2">Coming Soon</Badge>
+                      <p className="text-sm text-gray-500 mt-1">
+                        Pay when your order is delivered
+                      </p>
+                    </Label>
                   </div>
-                  <div className="flex justify-between items-center text-lg font-semibold border-t pt-2">
-                    <span>Total:</span>
-                    <span>{formatPrice(total + 10000)}</span>
-                  </div>
-                </div>
+                </RadioGroup>
+              </CardContent>
+            </Card>
 
-                <Button 
-                  type="submit" 
-                  className="w-full bg-orange-500 hover:bg-orange-600 text-white"
-                  disabled={loading || items.length === 0}
-                >
-                  {loading ? 'Processing...' : 'Place Order via WhatsApp'}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
+            {/* Order Notes */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Order Notes (Optional)</CardTitle>
+                <CardDescription>
+                  Any special instructions for your order
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Special delivery instructions, color preferences, etc."
+                  rows={3}
+                />
+              </CardContent>
+            </Card>
+
+            {/* Submit Button */}
+            <Button
+              type="submit"
+              size="lg"
+              className="w-full"
+              disabled={loading}
+            >
+              {loading ? 'Processing...' : `Place Order - ${formatPrice(orderTotal)}`}
+            </Button>
+          </form>
         </div>
       </div>
     </div>
   );
-};
-
-export default Checkout;
+}
