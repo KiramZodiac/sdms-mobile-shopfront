@@ -1,17 +1,17 @@
 
-import { useState, useEffect } from "react";
-import { X } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import { FileUpload } from './FileUpload';
 
 interface Category {
-  id: string;
+  id?: string;
   name: string;
   slug: string;
   description?: string;
@@ -20,48 +20,61 @@ interface Category {
 }
 
 interface CategoryFormProps {
-  category?: Category | null;
+  category: Category | null;
   onClose: () => void;
   onSave: () => void;
 }
 
 export const CategoryForm = ({ category, onClose, onSave }: CategoryFormProps) => {
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<Category>({
     name: '',
     slug: '',
-    description: '',
-    image_url: '',
     is_active: true,
   });
+  const [imageUrl, setImageUrl] = useState('');
+  const [useUrlInput, setUseUrlInput] = useState(false);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
     if (category) {
-      setFormData({
-        name: category.name,
-        slug: category.slug,
-        description: category.description || '',
-        image_url: category.image_url || '',
-        is_active: category.is_active,
-      });
+      setFormData(category);
+      if (category.image_url) {
+        setImageUrl(category.image_url);
+      }
     }
   }, [category]);
 
   const generateSlug = (name: string) => {
     return name
       .toLowerCase()
-      .replace(/[^a-z0-9 -]/g, '')
-      .replace(/\s+/g, '-')
-      .replace(/-+/g, '-');
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '');
   };
 
-  const handleNameChange = (name: string) => {
-    setFormData(prev => ({
-      ...prev,
-      name,
-      slug: generateSlug(name)
-    }));
+  const handleInputChange = (field: keyof Category, value: any) => {
+    setFormData(prev => {
+      const updated = { ...prev, [field]: value };
+      if (field === 'name') {
+        updated.slug = generateSlug(value);
+      }
+      return updated;
+    });
+  };
+
+  const handleImageUpload = (url: string) => {
+    setImageUrl(url);
+    setFormData(prev => ({ ...prev, image_url: url }));
+  };
+
+  const handleImageUrlChange = (url: string) => {
+    setImageUrl(url);
+    setFormData(prev => ({ ...prev, image_url: url }));
+  };
+
+  const removeImage = () => {
+    setImageUrl('');
+    setFormData(prev => ({ ...prev, image_url: undefined }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -70,21 +83,18 @@ export const CategoryForm = ({ category, onClose, onSave }: CategoryFormProps) =
 
     try {
       const categoryData = {
-        name: formData.name,
-        slug: formData.slug,
-        description: formData.description,
-        image_url: formData.image_url,
-        is_active: formData.is_active,
+        ...formData,
+        image_url: imageUrl || null,
       };
 
-      if (category) {
+      if (category?.id) {
         const { error } = await supabase
           .from('categories')
           .update(categoryData)
           .eq('id', category.id);
 
         if (error) throw error;
-
+        
         toast({
           title: "Success",
           description: "Category updated successfully",
@@ -95,7 +105,7 @@ export const CategoryForm = ({ category, onClose, onSave }: CategoryFormProps) =
           .insert([categoryData]);
 
         if (error) throw error;
-
+        
         toast({
           title: "Success",
           description: "Category created successfully",
@@ -104,7 +114,7 @@ export const CategoryForm = ({ category, onClose, onSave }: CategoryFormProps) =
 
       onSave();
     } catch (error) {
-      console.error('Error saving category:', error);
+      console.error('Save error:', error);
       toast({
         title: "Error",
         description: "Failed to save category",
@@ -116,79 +126,127 @@ export const CategoryForm = ({ category, onClose, onSave }: CategoryFormProps) =
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>{category ? 'Edit Category' : 'Add Category'}</CardTitle>
-            <Button variant="ghost" size="sm" onClick={onClose}>
-              <X className="w-4 h-4" />
-            </Button>
-          </div>
-        </CardHeader>
-        
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <Label htmlFor="name">Category Name</Label>
+    <Dialog open={true} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>{category ? 'Edit Category' : 'Add New Category'}</DialogTitle>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Category Name *</Label>
               <Input
                 id="name"
                 value={formData.name}
-                onChange={(e) => handleNameChange(e.target.value)}
+                onChange={(e) => handleInputChange('name', e.target.value)}
                 required
               />
             </div>
 
-            <div>
+            <div className="space-y-2">
               <Label htmlFor="slug">Slug</Label>
               <Input
                 id="slug"
                 value={formData.slug}
-                onChange={(e) => setFormData(prev => ({ ...prev, slug: e.target.value }))}
-                required
+                onChange={(e) => handleInputChange('slug', e.target.value)}
+                placeholder="auto-generated"
               />
             </div>
+          </div>
 
-            <div>
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                value={formData.description}
-                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                rows={3}
+          <div className="space-y-2">
+            <Label htmlFor="description">Description</Label>
+            <Textarea
+              id="description"
+              value={formData.description || ''}
+              onChange={(e) => handleInputChange('description', e.target.value)}
+              rows={3}
+            />
+          </div>
+
+          {/* Category Image */}
+          <div className="space-y-4">
+            <div className="flex items-center space-x-4">
+              <Label>Category Image</Label>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="use_url"
+                  checked={useUrlInput}
+                  onCheckedChange={setUseUrlInput}
+                />
+                <Label htmlFor="use_url" className="text-sm">Use URL instead</Label>
+              </div>
+            </div>
+
+            {useUrlInput ? (
+              <div className="space-y-2">
+                <Label htmlFor="image_url">Image URL</Label>
+                <Input
+                  id="image_url"
+                  type="url"
+                  value={imageUrl}
+                  onChange={(e) => handleImageUrlChange(e.target.value)}
+                  placeholder="https://example.com/image.jpg"
+                />
+                {imageUrl && (
+                  <div className="relative">
+                    <img 
+                      src={imageUrl} 
+                      alt="Preview" 
+                      className="w-full h-32 object-cover rounded-lg border"
+                      onError={() => {
+                        toast({
+                          title: "Invalid URL",
+                          description: "The image URL is not valid",
+                          variant: "destructive",
+                        });
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      className="absolute top-2 right-2"
+                      onClick={removeImage}
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <FileUpload
+                onUpload={handleImageUpload}
+                bucket="category-images"
+                accept="image/*"
+                type="image"
+                label=""
+                currentFile={imageUrl}
+                onRemove={removeImage}
               />
-            </div>
+            )}
+          </div>
 
-            <div>
-              <Label htmlFor="image_url">Image URL</Label>
-              <Input
-                id="image_url"
-                value={formData.image_url}
-                onChange={(e) => setFormData(prev => ({ ...prev, image_url: e.target.value }))}
-                placeholder="https://example.com/image.jpg"
-              />
-            </div>
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="is_active"
+              checked={formData.is_active}
+              onCheckedChange={(checked) => handleInputChange('is_active', checked)}
+            />
+            <Label htmlFor="is_active">Active</Label>
+          </div>
 
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="is_active"
-                checked={formData.is_active}
-                onCheckedChange={(checked) => setFormData(prev => ({ ...prev, is_active: checked }))}
-              />
-              <Label htmlFor="is_active">Active</Label>
-            </div>
-
-            <div className="flex justify-end space-x-2 pt-4">
-              <Button type="button" variant="outline" onClick={onClose}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={loading}>
-                {loading ? 'Saving...' : category ? 'Update Category' : 'Create Category'}
-              </Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
-    </div>
+          <div className="flex justify-end space-x-2">
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={loading}>
+              {loading ? 'Saving...' : 'Save Category'}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 };

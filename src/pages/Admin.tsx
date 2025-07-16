@@ -1,6 +1,5 @@
-
 import { useState, useEffect } from "react";
-import { Plus, Edit, Trash2, Eye, EyeOff, Package, BarChart3, Users, ShoppingBag } from "lucide-react";
+import { Plus, Edit, Trash2, Eye, EyeOff, Package, BarChart3, Users, ShoppingBag, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -9,6 +8,8 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { ProductForm } from "@/components/admin/ProductForm";
 import { CategoryForm } from "@/components/admin/CategoryForm";
+import { AdminLogin } from "@/components/admin/AdminLogin";
+import { useAdminAuth } from "@/hooks/useAdminAuth";
 
 interface Product {
   id: string;
@@ -18,6 +19,7 @@ interface Product {
   description: string;
   short_description?: string;
   images: string[];
+  video_url?: string;
   stock_quantity: number;
   is_active: boolean;
   is_featured: boolean;
@@ -41,6 +43,7 @@ interface Category {
 }
 
 const Admin = () => {
+  const { admin, loading: authLoading, signOut } = useAdminAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -51,9 +54,30 @@ const Admin = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    fetchProducts();
-    fetchCategories();
-  }, []);
+    if (admin) {
+      fetchProducts();
+      fetchCategories();
+    }
+  }, [admin]);
+
+  if (authLoading) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="animate-pulse">
+          <div className="h-8 bg-gray-200 rounded w-48 mb-6"></div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="h-32 bg-gray-200 rounded"></div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!admin) {
+    return <AdminLogin />;
+  }
 
   const fetchProducts = async () => {
     try {
@@ -207,9 +231,15 @@ const Admin = () => {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Admin Dashboard</h1>
-        <p className="text-gray-600">Manage your store products and settings</p>
+      <div className="mb-8 flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Admin Dashboard</h1>
+          <p className="text-gray-600">Welcome back, {admin.email}</p>
+        </div>
+        <Button variant="outline" onClick={signOut}>
+          <LogOut className="w-4 h-4 mr-2" />
+          Sign Out
+        </Button>
       </div>
 
       {/* Stats Cards */}
@@ -306,6 +336,7 @@ const Admin = () => {
                           <span>SKU: {product.sku || 'N/A'}</span>
                           <span>Stock: {product.stock_quantity}</span>
                           <span>Category: {product.categories?.name || 'Uncategorized'}</span>
+                          {product.video_url && <span>📹 Video</span>}
                         </div>
                       </div>
                     </div>
@@ -394,6 +425,13 @@ const Admin = () => {
             {categories.map((category) => (
               <Card key={category.id}>
                 <CardContent className="p-4">
+                  {category.image_url && (
+                    <img 
+                      src={category.image_url} 
+                      alt={category.name}
+                      className="w-full h-32 object-cover rounded-lg mb-3"
+                    />
+                  )}
                   <div className="flex justify-between items-start mb-2">
                     <h3 className="font-semibold">{category.name}</h3>
                     <Badge variant={category.is_active ? "default" : "secondary"}>
