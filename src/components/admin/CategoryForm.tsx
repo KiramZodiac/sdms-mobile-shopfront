@@ -160,12 +160,13 @@ export const CategoryForm = ({ category, onClose, onSave }: CategoryFormProps) =
           </div>
 
           <div className="space-y-2">
-            <Label>Category Image</Label>
             <FileUpload
               onUpload={handleImageUpload}
               currentFile={formData.image_url}
               bucket="category-images"
               accept="image/*"
+              type="image"
+              label="Category Image"
             />
           </div>
 

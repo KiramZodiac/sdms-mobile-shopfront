@@ -15,6 +15,7 @@ export interface CartItem {
 interface CartContextType {
   items: CartItem[];
   addItem: (item: Omit<CartItem, 'quantity'>) => void;
+  addToCart: (item: Omit<CartItem, 'quantity'>) => void; // Add alias for consistency
   removeItem: (id: string) => void;
   updateQuantity: (id: string, quantity: number) => void;
   clearCart: () => void;
@@ -54,6 +55,9 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
+  // Add alias for consistency with component usage
+  const addToCart = addItem;
+
   const removeItem = (id: string) => {
     setItems(prev => prev.filter(item => item.id !== id));
     toast({
@@ -86,6 +90,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     <CartContext.Provider value={{
       items,
       addItem,
+      addToCart,
       removeItem,
       updateQuantity,
       clearCart,

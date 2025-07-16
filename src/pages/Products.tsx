@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { Filter, Grid, List, Star, ShoppingCart } from "lucide-react";
@@ -188,7 +187,7 @@ const Products = () => {
       id: product.id,
       name: product.name,
       price: product.price,
-      image: product.images[0] || '/placeholder.svg'
+      images: product.images || []
     });
   };
 
