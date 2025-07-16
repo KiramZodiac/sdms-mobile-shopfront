@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Star, ShoppingCart, Eye } from "lucide-react";
@@ -5,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useCart } from "@/hooks/useCart";
 import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 interface Product {
   id: string;
@@ -12,18 +14,23 @@ interface Product {
   price: number;
   original_price?: number;
   description: string;
+  short_description?: string;
   images: string[];
-  video_url?: string;
-  category: string;
   stock_quantity: number;
   rating?: number;
   reviews_count?: number;
+  slug: string;
+  categories?: {
+    name: string;
+    slug: string;
+  };
 }
 
 export const FeaturedProducts = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const { addToCart } = useCart();
+  const { toast } = useToast();
 
   useEffect(() => {
     fetchFeaturedProducts();
@@ -31,72 +38,52 @@ export const FeaturedProducts = () => {
 
   const fetchFeaturedProducts = async () => {
     try {
-      // For now, we'll use mock data since we haven't set up the database yet
-      const mockProducts: Product[] = [
-        {
-          id: "1",
-          name: "iPhone 15 Pro Max",
-          price: 1200000,
-          original_price: 1350000,
-          description: "Latest iPhone with A17 Pro chip and titanium design",
-          images: [
-            "https://images.unsplash.com/photo-1556656793-08538906a9f8?w=400",
-            "https://images.unsplash.com/photo-1510557880182-3d4d3cba35a5?w=400",
-            "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=400"
-          ],
-          category: "smartphones",
-          stock_quantity: 15,
-          rating: 4.8,
-          reviews_count: 124
-        },
-        {
-          id: "2",
-          name: "MacBook Pro 14\"",
-          price: 2500000,
-          description: "Powerful laptop with M3 chip for professionals",
-          images: [
-            "https://images.unsplash.com/photo-1496181133206-80ce9b88a853?w=400",
-            "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=400"
-          ],
-          category: "laptops",
-          stock_quantity: 8,
-          rating: 4.9,
-          reviews_count: 89
-        },
-        {
-          id: "3",
-          name: "Sony WH-1000XM5",
-          price: 450000,
-          original_price: 520000,
-          description: "Premium noise-canceling headphones",
-          images: [
-            "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400",
-            "https://images.unsplash.com/photo-1583394838336-acd977736f90?w=400"
-          ],
-          category: "audio",
-          stock_quantity: 25,
-          rating: 4.7,
-          reviews_count: 203
-        },
-        {
-          id: "4",
-          name: "Apple Watch Series 9",
-          price: 800000,
-          description: "Advanced smartwatch with health monitoring",
-          images: [
-            "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400",
-            "https://images.unsplash.com/photo-1551816230-ef5deaed4a26?w=400"
-          ],
-          category: "wearables",
-          stock_quantity: 20,
-          rating: 4.6,
-          reviews_count: 156
-        }
-      ];
+      const { data, error } = await supabase
+        .from('products')
+        .select(`
+          id,
+          name,
+          price,
+          original_price,
+          description,
+          short_description,
+          images,
+          stock_quantity,
+          rating,
+          reviews_count,
+          slug,
+          categories(name, slug)
+        `)
+        .eq('is_active', true)
+        .eq('is_featured', true)
+        .limit(8)
+        .order('created_at', { ascending: false });
 
-      setProducts(mockProducts);
+      if (error) throw error;
+
+      const transformedProducts = data?.map((product: any) => ({
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        original_price: product.original_price,
+        description: product.description || product.short_description || '',
+        short_description: product.short_description,
+        images: product.images || [],
+        stock_quantity: product.stock_quantity || 0,
+        rating: product.rating,
+        reviews_count: product.reviews_count,
+        slug: product.slug,
+        categories: product.categories
+      })) || [];
+
+      setProducts(transformedProducts);
     } catch (error) {
-      console.error('Error fetching products:', error);
+      console.error('Error fetching featured products:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load featured products",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
@@ -143,6 +130,19 @@ export const FeaturedProducts = () => {
     );
   }
 
+  if (products.length === 0) {
+    return (
+      <section className="py-12 bg-gray-50">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-8">
+            <h2 className="text-3xl font-bold text-gray-900 mb-4">Featured Products</h2>
+            <p className="text-gray-600">No featured products available at the moment.</p>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="py-12 bg-gray-50">
       <div className="container mx-auto px-4">
@@ -159,7 +159,7 @@ export const FeaturedProducts = () => {
               {/* Product Image */}
               <div className="relative aspect-square overflow-hidden rounded-t-lg">
                 <img
-                  src={product.images[0]}
+                  src={product.images[0] || '/placeholder.svg'}
                   alt={product.name}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                 />
@@ -171,7 +171,7 @@ export const FeaturedProducts = () => {
                       {Math.round(((product.original_price - product.price) / product.original_price) * 100)}% OFF
                     </Badge>
                   )}
-                  {product.stock_quantity < 10 && (
+                  {product.stock_quantity < 10 && product.stock_quantity > 0 && (
                     <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-300">
                       Low Stock
                     </Badge>
@@ -180,7 +180,7 @@ export const FeaturedProducts = () => {
 
                 {/* Quick Actions */}
                 <div className="absolute top-2 right-2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Link to={`/products/${product.id}`}>
+                  <Link to={`/products/${product.slug}`}>
                     <Button size="sm" variant="secondary" className="w-8 h-8 p-0">
                       <Eye className="w-4 h-4" />
                     </Button>
@@ -191,11 +191,13 @@ export const FeaturedProducts = () => {
               {/* Product Info */}
               <div className="p-4">
                 <div className="mb-2">
-                  <h3 className="font-semibold text-gray-900 text-sm mb-1 line-clamp-2">
-                    {product.name}
-                  </h3>
+                  <Link to={`/products/${product.slug}`}>
+                    <h3 className="font-semibold text-gray-900 text-sm mb-1 line-clamp-2 hover:text-blue-600 transition-colors">
+                      {product.name}
+                    </h3>
+                  </Link>
                   <p className="text-xs text-gray-500 line-clamp-2">
-                    {product.description}
+                    {product.short_description || product.description}
                   </p>
                 </div>
 

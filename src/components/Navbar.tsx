@@ -1,116 +1,139 @@
 
-import { ShoppingCart, Menu, X } from "lucide-react";
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { Menu, X, Search, User, ShoppingCart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { CartButton } from "@/components/CartButton";
 import { useCart } from "@/hooks/useCart";
-import { SearchBar } from "./SearchBar";
 
 export const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const { items } = useCart();
+  const [searchQuery, setSearchQuery] = useState("");
+  const navigate = useNavigate();
 
-  const cartItemsCount = items.reduce((sum, item) => sum + item.quantity, 0);
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      navigate(`/products?search=${encodeURIComponent(searchQuery.trim())}`);
+      setSearchQuery("");
+    }
+  };
 
   return (
-    <nav className="bg-white shadow-md sticky top-0 z-40">
+    <nav className="bg-white shadow-sm border-b sticky top-0 z-50">
       <div className="container mx-auto px-4">
-        <div className="flex justify-between items-center h-16">
+        <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link to="/" className="flex items-center space-x-2">
             <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
               <span className="text-white font-bold text-sm">SDM</span>
             </div>
-            <span className="font-bold text-xl text-gray-900">
-              SDM Electronics
-            </span>
+            <span className="text-xl font-bold text-gray-900">Electronics</span>
           </Link>
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-8">
-            <Link 
-              to="/" 
-              className="text-gray-700 hover:text-blue-600 transition-colors"
-            >
+            <Link to="/" className="text-gray-700 hover:text-blue-600 transition-colors">
               Home
             </Link>
-            <Link 
-              to="/products" 
-              className="text-gray-700 hover:text-blue-600 transition-colors"
-            >
+            <Link to="/products" className="text-gray-700 hover:text-blue-600 transition-colors">
               Products
             </Link>
           </div>
 
-          {/* Search Bar - Desktop */}
-          <div className="hidden md:block flex-1 max-w-md mx-8">
-            <SearchBar />
+          {/* Search Bar */}
+          <div className="hidden md:flex flex-1 max-w-lg mx-8">
+            <form onSubmit={handleSearch} className="relative w-full">
+              <Input
+                type="text"
+                placeholder="Search products..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pr-10"
+              />
+              <Button
+                type="submit"
+                size="sm"
+                variant="ghost"
+                className="absolute right-1 top-1/2 transform -translate-y-1/2 h-7 w-7 p-0"
+              >
+                <Search className="w-4 h-4" />
+              </Button>
+            </form>
           </div>
 
           {/* Desktop Actions */}
           <div className="hidden md:flex items-center space-x-4">
-            <Button variant="outline" size="sm" className="relative">
-              <ShoppingCart className="w-4 h-4" />
-              {cartItemsCount > 0 && (
-                <Badge 
-                  variant="destructive" 
-                  className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center p-0 text-xs"
-                >
-                  {cartItemsCount}
-                </Badge>
-              )}
-            </Button>
+            <CartButton />
+            <Link to="/admin">
+              <Button variant="ghost" size="sm">
+                <User className="w-4 h-4 mr-2" />
+                Admin
+              </Button>
+            </Link>
           </div>
 
-          {/* Mobile menu button */}
-          <div className="md:hidden">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-            >
-              {isMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-            </Button>
-          </div>
+          {/* Mobile Menu Button */}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="md:hidden"
+            onClick={() => setIsMenuOpen(!isMenuOpen)}
+          >
+            {isMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </Button>
         </div>
 
-        {/* Mobile Search Bar */}
-        <div className="md:hidden pb-4">
-          <SearchBar />
-        </div>
-
-        {/* Mobile Navigation */}
+        {/* Mobile Menu */}
         {isMenuOpen && (
           <div className="md:hidden border-t border-gray-200 py-4">
             <div className="flex flex-col space-y-4">
+              {/* Mobile Search */}
+              <form onSubmit={handleSearch} className="relative">
+                <Input
+                  type="text"
+                  placeholder="Search products..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pr-10"
+                />
+                <Button
+                  type="submit"
+                  size="sm"
+                  variant="ghost"
+                  className="absolute right-1 top-1/2 transform -translate-y-1/2 h-7 w-7 p-0"
+                >
+                  <Search className="w-4 h-4" />
+                </Button>
+              </form>
+
+              {/* Mobile Navigation Links */}
               <Link 
                 to="/" 
-                className="text-gray-700 hover:text-blue-600 transition-colors px-2 py-1"
+                className="text-gray-700 hover:text-blue-600 transition-colors py-2"
                 onClick={() => setIsMenuOpen(false)}
               >
                 Home
               </Link>
               <Link 
                 to="/products" 
-                className="text-gray-700 hover:text-blue-600 transition-colors px-2 py-1"
+                className="text-gray-700 hover:text-blue-600 transition-colors py-2"
                 onClick={() => setIsMenuOpen(false)}
               >
                 Products
               </Link>
-              <div className="flex items-center justify-between px-2 py-1">
-                <span className="text-gray-700">Cart</span>
-                <Button variant="outline" size="sm" className="relative">
-                  <ShoppingCart className="w-4 h-4" />
-                  {cartItemsCount > 0 && (
-                    <Badge 
-                      variant="destructive" 
-                      className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center p-0 text-xs"
-                    >
-                      {cartItemsCount}
-                    </Badge>
-                  )}
-                </Button>
+
+              {/* Mobile Actions */}
+              <div className="flex items-center space-x-4 pt-2">
+                <CartButton />
+                <Link to="/admin" onClick={() => setIsMenuOpen(false)}>
+                  <Button variant="ghost" size="sm">
+                    <User className="w-4 h-4 mr-2" />
+                    Admin
+                  </Button>
+                </Link>
               </div>
             </div>
           </div>

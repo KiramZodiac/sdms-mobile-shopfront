@@ -1,21 +1,19 @@
 
 import { createContext, useContext, useState, ReactNode } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { Button } from '@/components/ui/button';
-import { useNavigate } from 'react-router-dom';
 
-export interface CartItem {
+interface CartItem {
   id: string;
   name: string;
   price: number;
-  images: string[];
   quantity: number;
+  images: string[];
 }
 
 interface CartContextType {
   items: CartItem[];
   addItem: (item: Omit<CartItem, 'quantity'>) => void;
-  addToCart: (item: Omit<CartItem, 'quantity'>) => void; // Add alias for consistency
+  addToCart: (item: Omit<CartItem, 'quantity'>) => void;
   removeItem: (id: string) => void;
   updateQuantity: (id: string, quantity: number) => void;
   clearCart: () => void;
@@ -32,37 +30,33 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
   const addItem = (newItem: Omit<CartItem, 'quantity'>) => {
     setItems(prev => {
       const existingItem = prev.find(item => item.id === newItem.id);
-      
       if (existingItem) {
+        toast({
+          title: "Cart Updated",
+          description: `${newItem.name} quantity increased`,
+        });
         return prev.map(item =>
           item.id === newItem.id
             ? { ...item, quantity: item.quantity + 1 }
             : item
         );
+      } else {
+        toast({
+          title: "Added to Cart",
+          description: `${newItem.name} has been added to your cart`,
+        });
+        return [...prev, { ...newItem, quantity: 1 }];
       }
-      
-      const updatedItems = [...prev, { ...newItem, quantity: 1 }];
-      
-      toast({
-        title: "Added to cart",
-        description: `${newItem.name} has been added to your cart.`,
-        action: (
-          <ViewCartButton />
-        ),
-      });
-      
-      return updatedItems;
     });
   };
 
-  // Add alias for consistency with component usage
   const addToCart = addItem;
 
   const removeItem = (id: string) => {
     setItems(prev => prev.filter(item => item.id !== id));
     toast({
-      title: "Removed from cart",
-      description: "Item has been removed from your cart.",
+      title: "Item Removed",
+      description: "Item has been removed from your cart",
     });
   };
 
@@ -71,7 +65,6 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
       removeItem(id);
       return;
     }
-    
     setItems(prev =>
       prev.map(item =>
         item.id === id ? { ...item, quantity } : item
@@ -81,6 +74,10 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
 
   const clearCart = () => {
     setItems([]);
+    toast({
+      title: "Cart Cleared",
+      description: "All items have been removed from your cart",
+    });
   };
 
   const total = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
@@ -102,22 +99,9 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
   );
 };
 
-const ViewCartButton = () => {
-  const navigate = useNavigate();
-  
-  return (
-    <Button
-      size="sm"
-      onClick={() => navigate('/checkout')}
-    >
-      View Cart
-    </Button>
-  );
-};
-
 export const useCart = () => {
   const context = useContext(CartContext);
-  if (context === undefined) {
+  if (!context) {
     throw new Error('useCart must be used within a CartProvider');
   }
   return context;
