@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Edit, Trash2, Eye, EyeOff, Package, BarChart3, Users, ShoppingBag, LogOut } from "lucide-react";
+import { Plus, Edit, Trash2, Eye, EyeOff, Package, BarChart3, Users, ShoppingBag, LogOut, Image } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { ProductForm } from "@/components/admin/ProductForm";
 import { CategoryForm } from "@/components/admin/CategoryForm";
+import { BannerForm } from "@/components/admin/BannerForm";
 import { AdminLogin } from "@/components/admin/AdminLogin";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 
@@ -42,21 +43,37 @@ interface Category {
   is_active: boolean;
 }
 
+interface Banner {
+  id: string;
+  title: string;
+  subtitle: string | null;
+  image_url: string;
+  video_url: string | null;
+  cta_text: string | null;
+  cta_link: string | null;
+  is_active: boolean;
+  display_order: number;
+}
+
 const Admin = () => {
   const { admin, loading: authLoading, signOut } = useAdminAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [banners, setBanners] = useState<Banner[]>([]);
   const [loading, setLoading] = useState(true);
   const [showProductForm, setShowProductForm] = useState(false);
   const [showCategoryForm, setShowCategoryForm] = useState(false);
+  const [showBannerForm, setShowBannerForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [editingBanner, setEditingBanner] = useState<Banner | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
     if (admin) {
       fetchProducts();
       fetchCategories();
+      fetchBanners();
     }
   }, [admin]);
 
@@ -117,6 +134,25 @@ const Admin = () => {
       toast({
         title: "Error",
         description: "Failed to load categories",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const fetchBanners = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('banners')
+        .select('*')
+        .order('display_order');
+
+      if (error) throw error;
+      setBanners(data || []);
+    } catch (error) {
+      console.error('Error fetching banners:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load banners",
         variant: "destructive",
       });
     }
@@ -214,6 +250,61 @@ const Admin = () => {
     }).format(price);
   };
 
+  const toggleBannerStatus = async (bannerId: string, currentStatus: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('banners')
+        .update({ is_active: !currentStatus })
+        .eq('id', bannerId);
+
+      if (error) throw error;
+
+      setBanners(prev => prev.map(banner => 
+        banner.id === bannerId 
+          ? { ...banner, is_active: !currentStatus }
+          : banner
+      ));
+
+      toast({
+        title: "Success",
+        description: `Banner ${!currentStatus ? 'activated' : 'deactivated'} successfully`,
+      });
+    } catch (error) {
+      console.error('Error updating banner status:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update banner status",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const deleteBanner = async (bannerId: string) => {
+    if (!confirm('Are you sure you want to delete this banner?')) return;
+
+    try {
+      const { error } = await supabase
+        .from('banners')
+        .delete()
+        .eq('id', bannerId);
+
+      if (error) throw error;
+
+      setBanners(prev => prev.filter(banner => banner.id !== bannerId));
+      toast({
+        title: "Success",
+        description: "Banner deleted successfully",
+      });
+    } catch (error) {
+      console.error('Error deleting banner:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete banner",
+        variant: "destructive",
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -243,7 +334,7 @@ const Admin = () => {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Products</CardTitle>
@@ -266,6 +357,19 @@ const Admin = () => {
             <div className="text-2xl font-bold">{categories.length}</div>
             <p className="text-xs text-muted-foreground">
               {categories.filter(c => c.is_active).length} active
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Banners</CardTitle>
+            <Image className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{banners.length}</div>
+            <p className="text-xs text-muted-foreground">
+              {banners.filter(b => b.is_active).length} active
             </p>
           </CardContent>
         </Card>
@@ -305,6 +409,7 @@ const Admin = () => {
         <TabsList>
           <TabsTrigger value="products">Products</TabsTrigger>
           <TabsTrigger value="categories">Categories</TabsTrigger>
+          <TabsTrigger value="banners">Banners</TabsTrigger>
         </TabsList>
 
         <TabsContent value="products" className="space-y-4">
@@ -458,6 +563,86 @@ const Admin = () => {
             ))}
           </div>
         </TabsContent>
+
+        <TabsContent value="banners" className="space-y-4">
+          <div className="flex justify-between items-center">
+            <h2 className="text-2xl font-bold">Banners</h2>
+            <Button onClick={() => setShowBannerForm(true)}>
+              <Plus className="w-4 h-4 mr-2" />
+              Add Banner
+            </Button>
+          </div>
+
+          <div className="grid gap-4">
+            {banners.map((banner) => (
+              <Card key={banner.id}>
+                <CardContent className="p-6">
+                  <div className="flex items-start justify-between">
+                    <div className="flex space-x-4">
+                      <img
+                        src={banner.image_url}
+                        alt={banner.title}
+                        className="w-20 h-12 object-cover rounded-lg"
+                      />
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-lg">{banner.title}</h3>
+                        {banner.subtitle && (
+                          <p className="text-gray-600 text-sm mb-2">{banner.subtitle}</p>
+                        )}
+                        <div className="flex items-center space-x-4 text-sm text-gray-500">
+                          <span>Order: {banner.display_order}</span>
+                          {banner.cta_text && <span>CTA: {banner.cta_text}</span>}
+                          {banner.video_url && <span>📹 Video</span>}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center space-x-2">
+                      <div className="flex flex-col space-y-2">
+                        <Badge variant={banner.is_active ? "default" : "secondary"}>
+                          {banner.is_active ? 'Active' : 'Inactive'}
+                        </Badge>
+                        
+                        <div className="flex space-x-1">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => toggleBannerStatus(banner.id, banner.is_active)}
+                          >
+                            {banner.is_active ? (
+                              <EyeOff className="w-3 h-3" />
+                            ) : (
+                              <Eye className="w-3 h-3" />
+                            )}
+                          </Button>
+                          
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setEditingBanner(banner);
+                              setShowBannerForm(true);
+                            }}
+                          >
+                            <Edit className="w-3 h-3" />
+                          </Button>
+                          
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => deleteBanner(banner.id)}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
       </Tabs>
 
       {/* Product Form Modal */}
@@ -489,6 +674,22 @@ const Admin = () => {
             fetchCategories();
             setShowCategoryForm(false);
             setEditingCategory(null);
+          }}
+        />
+      )}
+
+      {/* Banner Form Modal */}
+      {showBannerForm && (
+        <BannerForm
+          banner={editingBanner}
+          onClose={() => {
+            setShowBannerForm(false);
+            setEditingBanner(null);
+          }}
+          onSave={() => {
+            fetchBanners();
+            setShowBannerForm(false);
+            setEditingBanner(null);
           }}
         />
       )}

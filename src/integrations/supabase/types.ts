@@ -38,6 +38,48 @@ export type Database = {
         }
         Relationships: []
       }
+      banners: {
+        Row: {
+          created_at: string | null
+          cta_link: string | null
+          cta_text: string | null
+          display_order: number | null
+          id: string
+          image_url: string
+          is_active: boolean | null
+          subtitle: string | null
+          title: string
+          updated_at: string | null
+          video_url: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          cta_link?: string | null
+          cta_text?: string | null
+          display_order?: number | null
+          id?: string
+          image_url: string
+          is_active?: boolean | null
+          subtitle?: string | null
+          title: string
+          updated_at?: string | null
+          video_url?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          cta_link?: string | null
+          cta_text?: string | null
+          display_order?: number | null
+          id?: string
+          image_url?: string
+          is_active?: boolean | null
+          subtitle?: string | null
+          title?: string
+          updated_at?: string | null
+          video_url?: string | null
+        }
+        Relationships: []
+      }
       categories: {
         Row: {
           created_at: string | null
