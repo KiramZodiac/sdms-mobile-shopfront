@@ -1,7 +1,6 @@
-
 import { useState, useEffect } from "react";
 import { useSearchParams, Link } from "react-router-dom";
-import { Filter, Grid, List, Star, ShoppingCart } from "lucide-react";
+import { Filter, Grid, List, Star, ShoppingCart, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
@@ -25,6 +24,7 @@ interface Product {
   reviews_count?: number;
   slug: string;
   sku?: string;
+  view_count?: number;
 }
 
 interface Category {
@@ -101,6 +101,7 @@ const Products = () => {
           reviews_count,
           slug,
           sku,
+          view_count,
           categories!inner(name, slug)
         `, { count: 'exact' })
         .eq('is_active', true);
@@ -126,6 +127,9 @@ const Products = () => {
         case 'rating':
           query = query.order('rating', { ascending: false });
           break;
+        case 'popular':
+          query = query.order('view_count', { ascending: false });
+          break;
         case 'newest':
         default:
           query = query.order('created_at', { ascending: false });
@@ -150,10 +154,11 @@ const Products = () => {
         images: product.images || [],
         category: product.categories?.slug || '',
         stock_quantity: product.stock_quantity || 0,
-        rating: product.rating,
-        reviews_count: product.reviews_count,
+        rating: product.rating || 4.0,
+        reviews_count: product.reviews_count || 0,
         slug: product.slug,
-        sku: product.sku
+        sku: product.sku,
+        view_count: product.view_count || 0
       })) || [];
 
       setProducts(transformedProducts);
@@ -170,12 +175,37 @@ const Products = () => {
     }
   };
 
+  // const incrementViewCount = async (productId: string) => {
+  //   try {
+  //     const { error } = await supabase.rpc('increment_product_view', {
+  //       product_id: productId
+  //     });
+
+  //     if (error) throw error;
+
+  //     setProducts(prev => prev.map(product => 
+  //       product.id === productId 
+  //         ? { ...product, view_count: (product.view_count || 0) + 1 }
+  //         : product
+  //     ));
+  //   } catch (error) {
+  //     console.error('Error incrementing view count:', error);
+  //   }
+  // };
+
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('en-UG', {
       style: 'currency',
       currency: 'UGX',
       minimumFractionDigits: 0
     }).format(price);
+  };
+
+  const formatViewCount = (count: number) => {
+    if (count >= 1000) {
+      return `${(count / 1000).toFixed(1)}k`;
+    }
+    return count.toString();
   };
 
   const handleAddToCart = (product: Product) => {
@@ -186,6 +216,10 @@ const Products = () => {
       images: product.images || []
     });
   };
+
+  // const handleProductClick = (product: Product) => {
+  //   incrementViewCount(product.id);
+  // };
 
   const handlePageChange = (newPage: number) => {
     const params = new URLSearchParams(searchParams);
@@ -367,6 +401,7 @@ const Products = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="newest">Newest First</SelectItem>
+                  <SelectItem value="popular">Most Popular</SelectItem>
                   <SelectItem value="price-low">Price: Low to High</SelectItem>
                   <SelectItem value="price-high">Price: High to Low</SelectItem>
                   <SelectItem value="rating">Highest Rated</SelectItem>
@@ -407,11 +442,15 @@ const Products = () => {
                 <div className={`relative overflow-hidden ${
                   viewMode === 'list' ? 'w-32 h-32 rounded-lg flex-shrink-0' : 'aspect-square rounded-t-lg'
                 }`}>
+                   <Link 
+                    to={`/products/${product.slug}`}
+                  
+                  >
                   <img
                     src={product.images[0] || '/placeholder.svg'}
                     alt={product.name}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
+                  /></Link>
                   
                   <div className="absolute top-2 left-2 flex flex-col gap-1">
                     {product.original_price && product.original_price > product.price && (
@@ -420,38 +459,43 @@ const Products = () => {
                       </Badge>
                     )}
                   </div>
+
+                  <div className="absolute top-2 right-2">
+                    <div className="bg-black bg-opacity-50 text-white px-2 py-1 rounded text-xs flex items-center gap-1">
+                      <Eye className="w-3 h-3" />
+                      {formatViewCount(product.view_count || 0)}
+                    </div>
+                  </div>
                 </div>
 
                 <div className={viewMode === 'list' ? 'flex-1' : 'p-4'}>
-                  <Link to={`/products/${product.slug}`}>
+                 
                     <h3 className="font-semibold text-gray-900 hover:text-blue-600 transition-colors mb-2">
                       {product.name}
                     </h3>
-                  </Link>
+                  
                   
                   <p className="text-sm text-gray-600 mb-2 line-clamp-2">
                     {product.short_description || product.description}
                   </p>
 
-                  {product.rating && (
-                    <div className="flex items-center gap-1 mb-2">
-                      <div className="flex">
-                        {[...Array(5)].map((_, i) => (
-                          <Star
-                            key={i}
-                            className={`w-3 h-3 ${
-                              i < Math.floor(product.rating!) 
-                                ? 'text-yellow-400 fill-current' 
-                                : 'text-gray-300'
-                            }`}
-                          />
-                        ))}
-                      </div>
-                      <span className="text-xs text-gray-500">
-                        ({product.reviews_count})
-                      </span>
+                  <div className="flex items-center gap-1 mb-2">
+                    <div className="flex">
+                      {[...Array(5)].map((_, i) => (
+                        <Star
+                          key={i}
+                          className={`w-3 h-3 ${
+                            i < Math.floor(product.rating || 4) 
+                              ? 'text-yellow-400 fill-current' 
+                              : 'text-gray-300'
+                          }`}
+                        />
+                      ))}
                     </div>
-                  )}
+                    <span className="text-xs text-gray-500">
+                      {product.rating?.toFixed(1) || '4.0'} ({product.reviews_count || 0})
+                    </span>
+                  </div>
 
                   <div className="mb-3">
                     <div className="flex items-center gap-2">

@@ -145,7 +145,7 @@ Total: ${formatPrice(orderTotal)}
 
 ${customerData.notes ? `Notes: ${customerData.notes}` : ''}`;
 
-      const whatsappUrl = `https://wa.me/256700000000?text=${encodeURIComponent(message)}`;
+      const whatsappUrl = `https://wa.me/256751214095?text=${encodeURIComponent(message)}`;
 
       // Update order with WhatsApp URL
       await supabase

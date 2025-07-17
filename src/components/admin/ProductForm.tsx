@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -129,6 +128,10 @@ export const ProductForm = ({ product, categories, onClose, onSave }: ProductFor
         original_price: formData.original_price ? Number(formData.original_price) : null,
         stock_quantity: Number(formData.stock_quantity),
         category_id: formData.category_id || null,
+        specifications: formData.specifications
+          ? JSON.parse(formData.specifications)
+          : null, // Parse specifications as JSON
+        features: formData.features || [], // Ensure features is an array
       };
 
       if (product?.id) {
@@ -266,6 +269,30 @@ export const ProductForm = ({ product, categories, onClose, onSave }: ProductFor
               value={formData.description}
               onChange={(e) => handleInputChange('description', e.target.value)}
               rows={4}
+            />
+          </div>
+
+          {/* <div className="space-y-2">
+            <Label htmlFor="specifications">Specifications</Label>
+            <Textarea
+              id="specifications"
+              value={formData.specifications || ''}
+              onChange={(e) => handleInputChange('specifications', e.target.value)}
+              rows={4}
+              placeholder='Enter specifications as JSON (e.g., {"key": "value"})'
+            />
+          </div> */}
+
+          <div className="space-y-2">
+            <Label htmlFor="features">Features</Label>
+            <Textarea
+              id="features"
+              value={formData.features?.join(', ') || ''}
+              onChange={(e) =>
+                handleInputChange('features', e.target.value.split(',').map((f) => f.trim()))
+              }
+              rows={4}
+              placeholder="Enter features separated by commas (e.g., Feature 1, Feature 2)"
             />
           </div>
 

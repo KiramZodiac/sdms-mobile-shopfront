@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Star, ShoppingCart, Eye } from "lucide-react";
@@ -9,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
 interface Product {
+  view_count: number;
   id: string;
   name: string;
   price: number;
@@ -52,6 +52,7 @@ export const FeaturedProducts = () => {
           rating,
           reviews_count,
           slug,
+          view_count,
           categories(name, slug)
         `)
         .eq('is_active', true)
@@ -73,7 +74,8 @@ export const FeaturedProducts = () => {
         rating: product.rating,
         reviews_count: product.reviews_count,
         slug: product.slug,
-        categories: product.categories
+        categories: product.categories,
+        view_count: product.view_count || 0
       })) || [];
 
       setProducts(transformedProducts);
@@ -106,6 +108,38 @@ export const FeaturedProducts = () => {
     });
   };
 
+
+  const formatViewCount = (count: number) => {
+    if (count >= 1000000) {
+      return `${(count / 1000000).toFixed(1)}M`;
+    } else if (count >= 1000) {
+      return `${(count / 1000).toFixed(1)}k`;
+    }
+    return count.toString();
+  };
+
+
+
+  const incrementViewCount = async (productId: string) => {
+    const viewedKey = `viewed-${productId}`;
+    if (sessionStorage.getItem(viewedKey)) return;
+  
+    try {
+      const { error } = await supabase.rpc('increment_product_view', {
+        product_id: productId,
+      });
+  
+      if (error) {
+        throw error;
+      }
+  
+      sessionStorage.setItem(viewedKey, 'true');
+    } catch (error) {
+      console.error('Failed to increment view count:', error);
+    }
+  };
+  
+
   if (loading) {
     return (
       <section className="py-12 bg-gray-50">
@@ -116,7 +150,7 @@ export const FeaturedProducts = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {[...Array(4)].map((_, i) => (
               <div key={i} className="bg-white rounded-lg shadow-sm animate-pulse">
-                <div className="h-48 bg-gray-200 rounded-t-lg"></div>
+                <div className="h-48 bg-gray-200 rounded-t失望-lg"></div>
                 <div className="p-4">
                   <div className="h-4 bg-gray-200 rounded mb-2"></div>
                   <div className="h-4 bg-gray-200 rounded w-3/4 mb-4"></div>
@@ -157,12 +191,18 @@ export const FeaturedProducts = () => {
           {products.map((product) => (
             <div key={product.id} className="bg-white rounded-lg shadow-sm hover:shadow-lg transition-shadow duration-300 group">
               <div className="relative aspect-square overflow-hidden rounded-t-lg">
-                <img
-                  src={product.images[0] || '/placeholder.svg'}
-                  alt={product.name}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                />
-                
+                <Link
+                  to={`/products/${product.slug}`}
+                  className="absolute inset-1"
+                  onClick={() => incrementViewCount(product.id)}
+                >
+                  <img
+                    src={product.images[0] || '/placeholder.svg'}
+                    alt={product.name}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  />
+                </Link>
+
                 <div className="absolute top-2 left-2 flex flex-col gap-1">
                   {product.original_price && product.original_price > product.price && (
                     <Badge className="bg-red-500 text-white">
@@ -176,12 +216,9 @@ export const FeaturedProducts = () => {
                   )}
                 </div>
 
-                <div className="absolute top-2 right-2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Link to={`/products/${product.slug}`}>
-                    <Button size="sm" variant="secondary" className="w-8 h-8 p-0">
-                      <Eye className="w-4 h-4" />
-                    </Button>
-                  </Link>
+                <div className="absolute top-2 right-2 flex items-center gap-1 bg-gray-900/80 text-white rounded-full px-2 py-1">
+                  <Eye className="w-4 h-4" />
+                  <span className="text-xs font-medium">{formatViewCount( product.view_count)}</span>
                 </div>
               </div>
 
@@ -197,25 +234,23 @@ export const FeaturedProducts = () => {
                   </p>
                 </div>
 
-                {product.rating && (
-                  <div className="flex items-center gap-1 mb-2">
-                    <div className="flex">
-                      {[...Array(5)].map((_, i) => (
-                        <Star
-                          key={i}
-                          className={`w-3 h-3 ${
-                            i < Math.floor(product.rating!) 
-                              ? 'text-yellow-400 fill-current' 
-                              : 'text-gray-300'
-                          }`}
-                        />
-                      ))}
-                    </div>
-                    <span className="text-xs text-gray-500">
-                      ({product.reviews_count})
-                    </span>
+                <div className="flex items-center gap-1 mb-2">
+                  <div className="flex">
+                    {[...Array(5)].map((_, i) => (
+                      <Star
+                        key={i}
+                        className={`w-3 h-3 ${
+                          i < Math.max(1, Math.floor(product.rating ?? 0))
+                            ? 'text-yellow-400 fill-current'
+                            : 'text-gray-300'
+                        }`}
+                      />
+                    ))}
                   </div>
-                )}
+                  <span className="text-xs text-gray-500">
+                    ({product.reviews_count ?? 0})
+                  </span>
+                </div>
 
                 <div className="mb-3">
                   <div className="flex items-center gap-2">
@@ -252,7 +287,7 @@ export const FeaturedProducts = () => {
 
         <div className="text-center mt-8">
           <Link to="/products">
-            <Button variant="outline" size="lg">
+         <Button variant="outline" size="lg">
               View All Products
             </Button>
           </Link>

@@ -305,6 +305,61 @@ const Admin = () => {
     }
   };
 
+  const toggleCategoryVisibility = async (categoryId: string, currentStatus: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('categories')
+        .update({ is_active: !currentStatus })
+        .eq('id', categoryId);
+
+      if (error) throw error;
+
+      setCategories(prev => prev.map(category => 
+        category.id === categoryId 
+          ? { ...category, is_active: !currentStatus }
+          : category
+      ));
+
+      toast({
+        title: "Success",
+        description: `Category ${!currentStatus ? 'activated' : 'deactivated'} successfully`,
+      });
+    } catch (error) {
+      console.error('Error updating category visibility:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update category visibility",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const deleteCategory = async (categoryId: string) => {
+    if (!confirm('Are you sure you want to delete this category?')) return;
+
+    try {
+      const { error } = await supabase
+        .from('categories')
+        .delete()
+        .eq('id', categoryId);
+
+      if (error) throw error;
+
+      setCategories(prev => prev.filter(category => category.id !== categoryId));
+      toast({
+        title: "Success",
+        description: "Category deleted successfully",
+      });
+    } catch (error) {
+      console.error('Error deleting category:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete category",
+        variant: "destructive",
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -547,6 +602,7 @@ const Admin = () => {
                     <p className="text-sm text-gray-600 mb-3">{category.description}</p>
                   )}
                   <div className="flex space-x-2">
+                    {/* Edit Button */}
                     <Button
                       size="sm"
                       variant="outline"
@@ -556,6 +612,28 @@ const Admin = () => {
                       }}
                     >
                       <Edit className="w-3 h-3" />
+                    </Button>
+
+                    {/* Toggle Visibility Button */}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => toggleCategoryVisibility(category.id, category.is_active)}
+                    >
+                      {category.is_active ? (
+                        <EyeOff className="w-3 h-3" />
+                      ) : (
+                        <Eye className="w-3 h-3" />
+                      )}
+                    </Button>
+
+                    {/* Delete Button */}
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => deleteCategory(category.id)}
+                    >
+                      <Trash2 className="w-3 h-3" />
                     </Button>
                   </div>
                 </CardContent>

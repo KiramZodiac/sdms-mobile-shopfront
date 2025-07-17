@@ -1,7 +1,6 @@
-
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Star, ShoppingCart, ArrowLeft, Heart, Share2 } from 'lucide-react';
+import { Star, ShoppingCart, ArrowLeft, Heart, Share2, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -17,13 +16,15 @@ interface Product {
   description: string;
   short_description?: string;
   images: string[];
+  video_url?: string;
   features?: string[];
-  specifications?: any;
+  specifications?: Record<string, any>;
   stock_quantity: number;
   rating?: number;
   reviews_count?: number;
   slug: string;
   sku?: string;
+  view_count?: number;
   categories?: {
     name: string;
     slug: string;
@@ -35,7 +36,7 @@ export default function ProductDetail() {
   const navigate = useNavigate();
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedImage, setSelectedImage] = useState(0);
+  const [selectedImage, setSelectedImage] = useState<number | 'video'>(0);
   const { addToCart } = useCart();
   const { toast } = useToast();
 
@@ -44,6 +45,10 @@ export default function ProductDetail() {
       fetchProduct(slug);
     }
   }, [slug]);
+
+  useEffect(() => {
+    setSelectedImage(product?.video_url ? 'video' : 0);
+  }, [product]);
 
   const fetchProduct = async (productSlug: string) => {
     try {
@@ -58,17 +63,27 @@ export default function ProductDetail() {
         .single();
 
       if (error) throw error;
-      
+
       if (data) {
-        setProduct(data);
-        await supabase.rpc('increment_product_view', { product_id: data.id });
+        const productData = {
+          ...data,
+          specifications: typeof data.specifications === 'string' ? JSON.parse(data.specifications) : data.specifications,
+          rating: data.rating || 4.0, // Default rating of 4.0 stars
+          reviews_count: data.reviews_count || 0,
+          view_count: data.view_count || 0
+        };
+        
+        setProduct(productData);
+        
+        // Increment view count
+        await incrementViewCount(data.id);
       }
     } catch (error) {
       console.error('Error fetching product:', error);
       toast({
-        title: "Error",
-        description: "Product not found",
-        variant: "destructive",
+        title: 'Error',
+        description: 'Product not found',
+        variant: 'destructive',
       });
       navigate('/products');
     } finally {
@@ -76,12 +91,42 @@ export default function ProductDetail() {
     }
   };
 
+  const incrementViewCount = async (productId: string) => {
+    try {
+      const { error } = await supabase.rpc('increment_product_view', {
+        product_id: productId
+      });
+
+      if (error) {
+        console.error('Error incrementing view count:', error);
+        return;
+      }
+
+      // Update the local state to reflect the new view count
+      setProduct(prev => prev ? { 
+        ...prev, 
+        view_count: (prev.view_count || 0) + 1 
+      } : null);
+    } catch (error) {
+      console.error('Error incrementing view count:', error);
+    }
+  };
+
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('en-UG', {
       style: 'currency',
       currency: 'UGX',
-      minimumFractionDigits: 0
+      minimumFractionDigits: 0,
     }).format(price);
+  };
+
+  const formatViewCount = (count: number) => {
+    if (count >= 1000000) {
+      return `${(count / 1000000).toFixed(1)}M`;
+    } else if (count >= 1000) {
+      return `${(count / 1000).toFixed(1)}k`;
+    }
+    return count.toString();
   };
 
   const handleAddToCart = () => {
@@ -90,7 +135,28 @@ export default function ProductDetail() {
         id: product.id,
         name: product.name,
         price: product.price,
-        images: product.images || []
+        images: product.images || [],
+      });
+    }
+  };
+
+  const handleShare = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: product?.name,
+          text: product?.short_description || product?.description,
+          url: window.location.href,
+        });
+      } catch (error) {
+        console.log('Error sharing:', error);
+      }
+    } else {
+      // Fallback: copy to clipboard
+      await navigator.clipboard.writeText(window.location.href);
+      toast({
+        title: 'Link Copied',
+        description: 'Product link has been copied to clipboard',
       });
     }
   };
@@ -136,28 +202,55 @@ export default function ProductDetail() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <Button
-        variant="ghost"
-        onClick={() => navigate(-1)}
-        className="mb-6"
-      >
+      <Button variant="ghost" onClick={() => navigate(-1)} className="mb-6">
         <ArrowLeft className="w-4 h-4 mr-2" />
         Back
       </Button>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="space-y-4">
-          <div className="aspect-square overflow-hidden rounded-lg bg-gray-100">
-            <img
-              src={product.images?.[selectedImage] || '/placeholder.svg'}
-              alt={product.name}
-              className="w-full h-full object-cover"
-            />
+          <div className="aspect-square overflow-hidden rounded-lg bg-gray-100 relative">
+            {selectedImage === 'video' && product.video_url ? (
+              <video controls autoPlay loop muted className="w-full h-full object-cover" src={product.video_url}>
+                Your browser does not support the video tag.
+              </video>
+            ) : (
+              <img
+                src={product.images?.[selectedImage as number] || '/placeholder.svg'}
+                alt={product.name}
+                className="w-full h-full object-cover"
+              />
+            )}
+            
+            {/* View count badge */}
+            <div className="absolute top-4 right-4">
+              <div className="bg-black bg-opacity-70 text-white px-3 py-1 rounded-full text-sm flex items-center gap-2">
+                <Eye className="w-4 h-4" />
+                {formatViewCount(product.view_count || 0)} views
+              </div>
+            </div>
           </div>
-          
-          {product.images && product.images.length > 1 && (
-            <div className="grid grid-cols-4 gap-2">
-              {product.images.map((image, index) => (
+
+          <div className="grid grid-cols-4 gap-2">
+            {product.video_url && (
+              <button
+                onClick={() => setSelectedImage('video')}
+                className={`aspect-square overflow-hidden rounded border-2 ${
+                  selectedImage === 'video' ? 'border-blue-600' : 'border-gray-200'
+                }`}
+              >
+                <video
+                  src={product.video_url}
+                  className="w-full h-full object-cover"
+                  muted
+                  preload="metadata"
+                  loop
+                />
+              </button>
+            )}
+
+            {product.images &&
+              product.images.map((image, index) => (
                 <button
                   key={index}
                   onClick={() => setSelectedImage(index)}
@@ -167,47 +260,46 @@ export default function ProductDetail() {
                 >
                   <img
                     src={image}
-                    alt={`${product.name} ${index + 1}`}
+                    alt={`${product.name || 'Product'} ${index + 1}`}
                     className="w-full h-full object-cover"
                   />
                 </button>
               ))}
-            </div>
-          )}
+          </div>
         </div>
 
         <div className="space-y-6">
           <div>
-            {product.categories && (
-              <Badge variant="outline" className="mb-2">
-                {product.categories.name}
-              </Badge>
-            )}
+            <div className="flex items-center justify-between mb-2">
+              {product.categories && (
+                <Badge variant="outline">
+                  {product.categories.name}
+                </Badge>
+              )}
+              <div className="flex items-center gap-2 text-sm text-gray-500">
+                <Eye className="w-4 h-4" />
+                {formatViewCount(product.view_count || 0)} views
+              </div>
+            </div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">{product.name}</h1>
-            {product.sku && (
-              <p className="text-sm text-gray-500">SKU: {product.sku}</p>
-            )}
+            {product.sku && <p className="text-sm text-gray-500">SKU: {product.sku}</p>}
           </div>
 
-          {product.rating && (
-            <div className="flex items-center gap-2">
-              <div className="flex">
-                {[...Array(5)].map((_, i) => (
-                  <Star
-                    key={i}
-                    className={`w-5 h-5 ${
-                      i < Math.floor(product.rating!) 
-                        ? 'text-yellow-400 fill-current' 
-                        : 'text-gray-300'
-                    }`}
-                  />
-                ))}
-              </div>
-              <span className="text-sm text-gray-600">
-                {product.rating} ({product.reviews_count} reviews)
-              </span>
+          <div className="flex items-center gap-2">
+            <div className="flex">
+              {[...Array(5)].map((_, i) => (
+                <Star
+                  key={i}
+                  className={`w-5 h-5 ${
+                    i < Math.floor(product.rating || 4) ? 'text-yellow-400 fill-current' : 'text-gray-300'
+                  }`}
+                />
+              ))}
             </div>
-          )}
+            <span className="text-sm text-gray-600">
+              {(product.rating || 4.0).toFixed(1)} ({product.reviews_count || 0} reviews)
+            </span>
+          </div>
 
           <div className="space-y-2">
             <div className="flex items-center gap-4">
@@ -232,10 +324,9 @@ export default function ProductDetail() {
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 bg-green-500 rounded-full"></div>
                 <span className="text-green-600 font-medium">
-                  {product.stock_quantity < 10 
-                    ? `Only ${product.stock_quantity} left in stock!` 
-                    : 'In Stock'
-                  }
+                  {product.stock_quantity < 10
+                    ? `Only ${product.stock_quantity} left in stock!`
+                    : 'In Stock'}
                 </span>
               </div>
             ) : (
@@ -283,7 +374,7 @@ export default function ProductDetail() {
             <Button variant="outline" size="lg">
               <Heart className="w-5 h-5" />
             </Button>
-            <Button variant="outline" size="lg">
+            <Button variant="outline" size="lg" onClick={handleShare}>
               <Share2 className="w-5 h-5" />
             </Button>
           </div>
