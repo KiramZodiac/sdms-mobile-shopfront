@@ -4,17 +4,19 @@ import { FeaturedCategories } from "@/components/FeaturedCategories";
 import { FeaturedProducts } from "@/components/FeaturedProducts";
 import PromoBanners from "@/components/PromoBanners";
 import StunningTopRatedBanner from "@/components/ui/TopRatedBanner";
+import TopRatedBanner from "@/components/ui/TopRatedBanner";
 
 const Index = () => {
   return (
     <div className="min-h-screen">
-      <HeroBanner />
+       <HeroBanner /> 
       <FeaturedCategories />
-      {/* <PromoBanners /> */}
-      {/* <StunningTopRatedBanner /> */}
+      <PromoBanners /> 
+      {/* <StunningTopRatedBanner /> 
 
 
       {/* Featured Products Section */}
+      {/* <TopRatedBanner />   */}
       <FeaturedProducts />
       
       {/* Newsletter Section */}

@@ -257,20 +257,20 @@ export const FeaturedProducts = () => {
                   
                   {/* Image Container */}
                   <div className="relative overflow-hidden">
-                    <Link
-                      to={`/products/${product.slug}`}
-                      onClick={() => incrementViewCount(product.id)}
-                      className="block"
-                    >
-                      <img
-                        src={product.images[0] || "/placeholder.svg"}
-                        alt={product.name}
-                        className="w-full h-32 sm:h-36 md:h-40 object-cover transition-transform duration-700 group-hover:scale-110"
-                      />
-                    </Link>
+                  <Link
+  to={`/products/${product.slug}`}
+  onClick={() => incrementViewCount(product.id)}
+  className="block group"
+>
+  <img
+    src={product.images?.[0] || "/placeholder.svg"}
+    alt={product.name}
+    className="w-full h-32 sm:h-36 md:h-40 object-cover transition-transform duration-700 group-hover:scale-105 rounded-md"
+  />
+</Link>
                     
                     {/* Image Overlay */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                 <a href={`/products/${product.slug}`}>   <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div></a>
                     
                     {/* Favorite Button */}
                     <button
