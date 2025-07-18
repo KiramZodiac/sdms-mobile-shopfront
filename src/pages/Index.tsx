@@ -2,16 +2,23 @@
 import { HeroBanner } from "@/components/HeroBanner";
 import { FeaturedCategories } from "@/components/FeaturedCategories";
 import { FeaturedProducts } from "@/components/FeaturedProducts";
+import PromoBanners from "@/components/PromoBanners";
+import StunningTopRatedBanner from "@/components/ui/TopRatedBanner";
 
 const Index = () => {
   return (
     <div className="min-h-screen">
       <HeroBanner />
       <FeaturedCategories />
+      {/* <PromoBanners /> */}
+      {/* <StunningTopRatedBanner /> */}
+
+
+      {/* Featured Products Section */}
       <FeaturedProducts />
       
       {/* Newsletter Section */}
-      <section className="py-16 bg-blue-600">
+      <section className="py-16 bg-gradient-to-r from-orange-400 to-orange-600">
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-3xl font-bold text-white mb-4">
             Stay Updated with Latest Tech
