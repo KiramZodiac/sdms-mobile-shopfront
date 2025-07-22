@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
 import { Sparkles, ChevronLeft, ChevronRight } from "lucide-react";
+import { Button } from "./ui/button.tsx";
 
 
 const latestProducts = [
@@ -53,7 +53,7 @@ function PromoBanners() {
     );
   };
 
-  const goToSlide = (index) => {
+  const goToSlide = (index: React.SetStateAction<number>) => {
     setCurrentIndex(index);
   };
 
@@ -126,29 +126,27 @@ function PromoBanners() {
         </div>
 
         {/* Navigation Buttons */}
-        <a href={`/products?category=${product.category}`}>
-          <button
+          <Button
             onClick={prevSlide}
             className="absolute top-1/2 left-2 -translate-y-1/2 w-8 h-8 bg-white/90 hover:bg-white text-gray-700 rounded-full shadow-lg transition-all duration-200 flex items-center justify-center hover:scale-110"
           >
             <ChevronLeft className="w-4 h-4" />
-          </button>
-        </a>
-        <a href={`/products?category=${product.category}`}>
-          <button
+          </Button>
+        
+          <Button
             onClick={nextSlide}
             className="absolute top-1/2 right-2 -translate-y-1/2 w-8 h-8 bg-white/90 hover:bg-white text-gray-700 rounded-full shadow-lg transition-all duration-200 flex items-center justify-center hover:scale-110"
           >
             <ChevronRight className="w-4 h-4" />
-          </button>
-        </a>
+          </Button>
+        
       </div>
 
       {/* Dot Indicators */}
       <div className="flex justify-center mt-4 space-x-2">
         {latestProducts.map((product, index) => (
           <a href={`/products?category=${product.category}`} key={index}>
-            <button
+            <Button
               onClick={() => goToSlide(index)}
               className={`w-2 h-2 rounded-full transition-all duration-300 ${
                 index === currentIndex

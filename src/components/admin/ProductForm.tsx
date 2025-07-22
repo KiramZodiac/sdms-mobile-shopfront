@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectItem, SelectTrigger, SelectValue, SelectContent } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
@@ -48,12 +48,15 @@ export const ProductForm = ({ product, categories, onClose, onSave }: ProductFor
     name: '',
     price: 0,
     description: '',
+    short_description: '',
     images: [],
     stock_quantity: 0,
     is_active: true,
     is_featured: false,
     slug: '',
+    sku: '',
     features: [],
+    
   });
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -71,28 +74,80 @@ export const ProductForm = ({ product, categories, onClose, onSave }: ProductFor
       .replace(/(^-|-$)/g, '');
   };
 
+  const generateSKU = (name: string) => {
+    return name
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, '')
+      .slice(0, 6) + '-' + Math.floor(1000 + Math.random() * 9000);
+  };
+
   const handleInputChange = (field: keyof Product, value: any) => {
     setFormData(prev => {
       const updated = { ...prev, [field]: value };
       if (field === 'name') {
         updated.slug = generateSlug(value);
+        if (!prev.sku) {
+          updated.sku = generateSKU(value);
+        }
       }
       return updated;
     });
   };
 
-  const handleImageUpload = (url: string) => {
-    if (formData.images.length < 3) {
-      setFormData(prev => ({
-        ...prev,
-        images: [...prev.images, url]
-      }));
-    } else {
+  const analyzerUrl = 'https://rvteqxtonbgjuhztnzpx.supabase.co/functions/v1/analyze-product-image';
+
+  const handleImageUpload = async (url: string) => {
+    if (formData.images.length >= 3) {
       toast({
         title: "Limit reached",
         description: "You can only upload up to 3 images per product",
         variant: "destructive",
       });
+      return;
+    }
+
+    setFormData(prev => ({
+      ...prev,
+      images: [...prev.images, url]
+    }));
+
+    if (formData.images.length === 0 && !formData.description && !formData.name && !formData.features?.length && !formData.short_description && !formData.sku) {
+      try {
+        const session = await supabase.auth.getSession();
+        const access_token = session.data.session?.access_token;
+        const response = await fetch(analyzerUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${access_token}`,
+          },
+          body: JSON.stringify({ image_url: url }),
+        });
+        const data = await response.json();
+        if (data.title && data.description && data.features && data.short_description && data.sku) {
+          setFormData(prev => ({
+            ...prev,
+            name: data.title,
+            slug: generateSlug(data.title),
+            description: data.description,
+            short_description: data.short_description,
+            sku: data.sku,
+            features: data.features
+          }));
+          toast({
+            title: 'AI Fields Generated',
+            description: 'Title, SKU, description, short description, and features generated from image.',
+          });
+        } else {
+          throw new Error('Incomplete data returned');
+        }
+      } catch (err) {
+        toast({
+          title: 'AI Generation Failed',
+          description: 'Could not generate fields from image.',
+          variant: 'destructive',
+        });
+      }
     }
   };
 
@@ -120,28 +175,33 @@ export const ProductForm = ({ product, categories, onClose, onSave }: ProductFor
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-
+  
     try {
+      // ✅ Remove the invalid "categories" key
+      const { categories, ...cleanFormData } = formData as any;
+  
       const productData = {
-        ...formData,
-        price: Number(formData.price),
-        original_price: formData.original_price ? Number(formData.original_price) : null,
-        stock_quantity: Number(formData.stock_quantity),
-        category_id: formData.category_id || null,
-        specifications: formData.specifications
-          ? JSON.parse(formData.specifications)
-          : null, // Parse specifications as JSON
-        features: formData.features || [], // Ensure features is an array
+        ...cleanFormData,
+        price: Number(cleanFormData.price),
+        original_price: cleanFormData.original_price ? Number(cleanFormData.original_price) : null,
+        stock_quantity: Number(cleanFormData.stock_quantity),
+        category_id: cleanFormData.category_id || null,
+        specifications: cleanFormData.specifications
+          ? JSON.parse(cleanFormData.specifications)
+          : null,
+        features: cleanFormData.features || [],
       };
-
+  
+      console.log('Submitting productData:', JSON.stringify(productData, null, 2));
+  
       if (product?.id) {
         const { error } = await supabase
           .from('products')
           .update(productData)
           .eq('id', product.id);
-
+  
         if (error) throw error;
-        
+  
         toast({
           title: "Success",
           description: "Product updated successfully",
@@ -150,15 +210,15 @@ export const ProductForm = ({ product, categories, onClose, onSave }: ProductFor
         const { error } = await supabase
           .from('products')
           .insert([productData]);
-
+  
         if (error) throw error;
-        
+  
         toast({
           title: "Success",
           description: "Product created successfully",
         });
       }
-
+  
       onSave();
     } catch (error) {
       console.error('Save error:', error);
@@ -171,7 +231,7 @@ export const ProductForm = ({ product, categories, onClose, onSave }: ProductFor
       setLoading(false);
     }
   };
-
+  
   return (
     <Dialog open={true} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -272,17 +332,6 @@ export const ProductForm = ({ product, categories, onClose, onSave }: ProductFor
             />
           </div>
 
-          {/* <div className="space-y-2">
-            <Label htmlFor="specifications">Specifications</Label>
-            <Textarea
-              id="specifications"
-              value={formData.specifications || ''}
-              onChange={(e) => handleInputChange('specifications', e.target.value)}
-              rows={4}
-              placeholder='Enter specifications as JSON (e.g., {"key": "value"})'
-            />
-          </div> */}
-
           <div className="space-y-2">
             <Label htmlFor="features">Features</Label>
             <Textarea
@@ -296,7 +345,6 @@ export const ProductForm = ({ product, categories, onClose, onSave }: ProductFor
             />
           </div>
 
-          {/* Product Images */}
           <div className="space-y-4">
             <Label>Product Images (Max 3)</Label>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -331,7 +379,6 @@ export const ProductForm = ({ product, categories, onClose, onSave }: ProductFor
             </div>
           </div>
 
-          {/* Product Video */}
           <FileUpload
             onUpload={handleVideoUpload}
             bucket="product-videos"

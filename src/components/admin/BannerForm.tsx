@@ -121,6 +121,38 @@ export const BannerForm = ({ banner, onClose, onSave }: BannerFormProps) => {
     }
   };
 
+  const analyzerUrl = 'https://rvteqxtonbgjuhztnzpx.supabase.co/functions/v1/analyze-product-image'
+
+  const handleBannerImageUpload = async (url: string) => {
+    setFormData(prev => ({ ...prev, image_url: url }));
+    // Only auto-describe if subtitle is empty
+    if (!formData.subtitle) {
+      try {
+        const response = await fetch(analyzerUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageUrl: url }),
+        });
+        const data = await response.json();
+        if (data.description) {
+          setFormData(prev => ({ ...prev, subtitle: data.description }));
+          toast({
+            title: 'AI Description Added',
+            description: 'A subtitle was generated from the image.',
+          });
+        } else {
+          throw new Error('No description returned');
+        }
+      } catch (err) {
+        toast({
+          title: 'AI Description Failed',
+          description: 'Could not generate subtitle from image.',
+          variant: 'destructive',
+        });
+      }
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
       <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -156,7 +188,7 @@ export const BannerForm = ({ banner, onClose, onSave }: BannerFormProps) => {
             </div>
 
             <FileUpload
-              onUpload={(url) => setFormData(prev => ({ ...prev, image_url: url }))}
+              onUpload={handleBannerImageUpload}
               bucket="product-images"
               accept="image/*"
               type="image"

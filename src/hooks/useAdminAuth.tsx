@@ -2,6 +2,7 @@
 import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useLocation } from 'react-router-dom';
 
 interface AdminUser {
   id: string;
@@ -23,6 +24,7 @@ export const AdminAuthProvider = ({ children }: { children: ReactNode }) => {
   const [admin, setAdmin] = useState<AdminUser | null>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const location = useLocation();
 
   useEffect(() => {
     // Check if user is already logged in
@@ -73,6 +75,18 @@ export const AdminAuthProvider = ({ children }: { children: ReactNode }) => {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  // Automatically logout when user leaves the admin page
+  useEffect(() => {
+    // Only run this effect if the user is currently logged in as admin
+    if (!admin) return;
+
+    // If the current path does not start with /Admin, log out
+    if (!location.pathname.startsWith('/Admin')) {
+      signOut();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]);
 
   const signIn = async (email: string, password: string): Promise<{ error?: string }> => {
     try {

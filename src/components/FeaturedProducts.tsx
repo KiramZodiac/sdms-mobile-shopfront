@@ -257,21 +257,22 @@ export const FeaturedProducts = () => {
                   
                   {/* Image Container */}
                   <div className="relative overflow-hidden">
-                  <Link
-  to={`/products/${product.slug}`}
-  onClick={() => incrementViewCount(product.id)}
-  className="block group"
->
-  <img
-    src={product.images?.[0] || "/placeholder.svg"}
-    alt={product.name}
-    className="w-full h-32 sm:h-36 md:h-40 object-cover transition-transform duration-700 group-hover:scale-105 rounded-md"
-  />
-</Link>
+                    <Link
+                      to={`/products/${product.slug}`}
+                      onClick={() => incrementViewCount(product.id)}
+                      className="block group"
+                    >
+                      <img
+                        src={product.images?.[0] || "/placeholder.svg"}
+                        alt={product.name}
+                        className="w-full h-32 sm:h-36 md:h-40 object-cover transition-transform duration-700 group-hover:scale-105 rounded-md"
+                      />
+                    </Link>
                     
                     {/* Image Overlay */}
-                 <a href={`/products/${product.slug}`}>   <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div></a>
-                    
+                    <Link to={`/products/${product.slug}`} className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                    </Link>
                     {/* Favorite Button */}
                     <button
                       onClick={() => toggleFavorite(product.id)}
@@ -312,23 +313,23 @@ export const FeaturedProducts = () => {
                     </Link>
                     
                     {/* Rating */}
-                    {product.rating && (
-                      <div className="flex items-center gap-1 mb-2">
-                        <div className="flex items-center">
-                          {[...Array(5)].map((_, i) => (
-                            <Star
-                              key={i}
-                              className={`w-3 h-3 ${
-                                i < Math.floor(product.rating!)
-                                  ? 'text-yellow-400 fill-current'
-                                  : 'text-gray-300'
-                              }`}
-                            />
-                          ))}
-                        </div>
-                        <span className="text-xs text-gray-600">({product.reviews_count})</span>
+                    <div className="flex items-center gap-1 mb-2">
+                      <div className="flex items-center">
+                        {[...Array(5)].map((_, i) => (
+                          <Star
+                            key={i}
+                            className={`w-3 h-3 ${
+                              product.rating && i < Math.floor(product.rating)
+                                ? 'text-yellow-400 fill-current'
+                                : 'text-gray-300'
+                            }`}
+                          />
+                        ))}
                       </div>
-                    )}
+                      {product.reviews_count! > 0 && (
+                        <span className="text-xs text-gray-600">({product.reviews_count})</span>
+                      )}
+                    </div>
 
                     {/* Price */}
                     <div className="mb-2 sm:mb-3">
@@ -383,8 +384,6 @@ export const FeaturedProducts = () => {
                   {/* Hover Effect Shine */}
                   <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 pointer-events-none"></div>
                 </div>
-
-                {/* Floating Quick Actions - Removed */}
               </motion.div>
             ))}
           </AnimatePresence>

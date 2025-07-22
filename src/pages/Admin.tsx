@@ -11,6 +11,7 @@ import { CategoryForm } from "@/components/admin/CategoryForm";
 import { BannerForm } from "@/components/admin/BannerForm";
 import { AdminLogin } from "@/components/admin/AdminLogin";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
+import { useLocation, useNavigate } from "react-router-dom";
 
 interface Product {
   id: string;
@@ -68,7 +69,96 @@ const Admin = () => {
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [editingBanner, setEditingBanner] = useState<Banner | null>(null);
   const { toast } = useToast();
+  const location = useLocation();
+  const navigate = useNavigate();
 
+  // Enhanced session management - logout when leaving admin pages
+  useEffect(() => {
+    // Only run if admin is logged in
+    if (!admin || authLoading) return;
+
+    // Function to handle logout
+    const handleLogout = async () => {
+      try {
+        await signOut();
+        
+        // Clear all possible session storage
+        localStorage.removeItem('sb-rvteqxtonbgjuhztnzpx-auth-token');
+        sessionStorage.clear();
+        
+        // Clear any other admin-related data
+        localStorage.removeItem('admin-session');
+        
+        toast({
+          title: 'Session Ended',
+          description: 'You have been logged out for security.',
+          variant: 'default'
+        });
+        
+        // Redirect to login or home page
+        navigate('/admin/login');
+        
+      } catch (error) {
+        console.error('Error during logout:', error);
+      }
+    };
+
+    // Check if current path is NOT an admin route
+    const isAdminRoute = location.pathname.startsWith('/admin');
+    
+    if (!isAdminRoute) {
+      handleLogout();
+    }
+  }, [location.pathname, admin, authLoading, signOut, navigate, toast]);
+
+  // Additional security: Handle browser navigation events
+  useEffect(() => {
+    if (!admin) return;
+
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      // This will trigger when user tries to close tab/browser
+      // Clear session data immediately
+      localStorage.removeItem('sb-rvteqxtonbgjuhztnzpx-auth-token');
+      sessionStorage.clear();
+      localStorage.removeItem('admin-session');
+    };
+
+    const handleVisibilityChange = () => {
+      // When tab becomes hidden and user is on non-admin page
+      if (document.hidden && !location.pathname.startsWith('/admin')) {
+        signOut();
+        localStorage.removeItem('sb-rvteqxtonbgjuhztnzpx-auth-token');
+        sessionStorage.clear();
+        localStorage.removeItem('admin-session');
+        console.log('session ended');
+        
+      }
+    };
+
+    const handlePopState = (event: PopStateEvent) => {
+      // Handle back/forward button navigation
+      if (!location.pathname.startsWith('/admin')) {
+        signOut();
+        localStorage.removeItem('sb-rvteqxtonbgjuhztnzpx-auth-token');
+        sessionStorage.clear();
+        localStorage.removeItem('admin-session');
+      }
+    };
+
+    // Add event listeners
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('popstate', handlePopState);
+
+    // Cleanup event listeners
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [admin, location.pathname, signOut]);
+
+  // Load data when admin is authenticated
   useEffect(() => {
     if (admin) {
       fetchProducts();
@@ -76,6 +166,33 @@ const Admin = () => {
       fetchBanners();
     }
   }, [admin]);
+
+  // Enhanced sign out function
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      
+      // Clear all session data
+      localStorage.clear();
+      sessionStorage.clear();
+      
+      toast({
+        title: 'Signed Out',
+        description: 'You have been successfully signed out.',
+      });
+      
+      // Navigate to login page
+      navigate('/admin/login');
+      
+    } catch (error) {
+      console.error('Error signing out:', error);
+      toast({
+        title: 'Error',
+        description: 'Error signing out. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  };
 
   if (authLoading) {
     return (
@@ -382,7 +499,7 @@ const Admin = () => {
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Admin Dashboard</h1>
           <p className="text-gray-600">Welcome back, {admin.email}</p>
         </div>
-        <Button variant="outline" onClick={signOut}>
+        <Button variant="outline" onClick={handleSignOut}>
           <LogOut className="w-4 h-4 mr-2" />
           Sign Out
         </Button>
@@ -774,5 +891,4 @@ const Admin = () => {
     </div>
   );
 };
-
-export default Admin;
+export default Admin

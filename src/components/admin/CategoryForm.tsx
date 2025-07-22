@@ -65,8 +65,36 @@ export const CategoryForm = ({ category, onClose, onSave }: CategoryFormProps) =
     }));
   };
 
-  const handleImageUpload = (url: string) => {
+  const analyzerUrl = 'https://rvteqxtonbgjuhztnzpx.supabase.co/functions/v1/analyze-product-image';
+
+  const handleImageUpload = async (url: string) => {
     setFormData(prev => ({ ...prev, image_url: url }));
+    // Only auto-describe if description is empty
+    if (!formData.description) {
+      try {
+        const response = await fetch(analyzerUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageUrl: url }),
+        });
+        const data = await response.json();
+        if (data.description) {
+          setFormData(prev => ({ ...prev, description: data.description }));
+          toast({
+            title: 'AI Description Added',
+            description: 'A description was generated from the image.',
+          });
+        } else {
+          throw new Error('No description returned');
+        }
+      } catch (err) {
+        toast({
+          title: 'AI Description Failed',
+          description: 'Could not generate description from image.',
+          variant: 'destructive',
+        });
+      }
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
