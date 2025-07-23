@@ -11,13 +11,14 @@ const Index = () => {
     <div className="min-h-screen">
        <HeroBanner /> 
       <FeaturedCategories />
+      <FeaturedProducts />
       <PromoBanners /> 
       {/* <StunningTopRatedBanner /> 
 
 
       {/* Featured Products Section */}
       {/* <TopRatedBanner />   */}
-      <FeaturedProducts />
+     
       
       {/* Newsletter Section */}
       <section className="py-16 bg-gradient-to-r from-orange-400 to-orange-600">
