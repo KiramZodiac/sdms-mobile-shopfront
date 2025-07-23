@@ -106,7 +106,7 @@ export const Navbar = () => {
               <CartButton />
               <div className="bg-white/20 text-white px-3 py-1 rounded-full text-sm font-medium">
                 <span className="flex items-center space-x-1">
-                  <span>🇺🇬UGX</span>
+                  <span>🇺🇬UG</span>
                   <span className="hidden sm:inline">UGX</span>
                 </span>
               </div>

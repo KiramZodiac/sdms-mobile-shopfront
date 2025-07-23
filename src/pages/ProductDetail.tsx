@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Star, ShoppingCart, ArrowLeft, Heart, Share2, Eye } from 'lucide-react';
+import { Star, ShoppingCart, ArrowLeft, Heart, Share2, Eye, Phone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -371,8 +371,10 @@ export default function ProductDetail() {
                 </>
               )}
             </Button>
+                                                                                                                                                                                                                                                                                                                                                                                                                                               
+
             <Button variant="outline" size="lg">
-              <Heart className="w-5 h-5" />
+              <Phone className="w-5 h-5" />
             </Button>
             <Button variant="outline" size="lg" onClick={handleShare}>
               <Share2 className="w-5 h-5" />

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Star, ShoppingCart, Eye, Heart, Zap, TrendingUp, Crown } from "lucide-react";
+import { Star, ShoppingCart, Eye, Heart, Zap, TrendingUp, Crown, Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useCart } from "@/hooks/useCart";
@@ -215,7 +215,7 @@ export const FeaturedProducts = () => {
             <Crown className="w-4 h-4" />
             <span className="animate-pulse">LIMITED TIME OFFERS</span>
           </div>
-          <h2 className="text-4xl md:text-5xl font-bold text-black mb-4 bg-gradient-to-r from-black via-blue-500 to-purple-200 bg-clip-text text-transparent">
+          <h2 className="text-2xl md:text-5xl font-bold text-black mb-4 bg-gradient-to-r from-black via-blue-500 to-purple-200 bg-clip-text text-transparent">
             Best Value, All Day | Top Rated Deals
           </h2>
           <p className="text-xl text-blue-500 mb-6 max-w-2xl mx-auto">
@@ -274,7 +274,7 @@ export const FeaturedProducts = () => {
                     <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
                     </Link>
                     {/* Favorite Button */}
-                    <button
+                    {/* <button
                       onClick={() => toggleFavorite(product.id)}
                       className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center transition-all duration-300 hover:scale-110 hover:bg-white shadow-lg"
                     >
@@ -285,7 +285,7 @@ export const FeaturedProducts = () => {
                             : 'text-gray-600 hover:text-red-500'
                         }`}
                       />
-                    </button>
+                    </button> */}
 
                     {/* Discount Badge */}
                     {product.original_price && product.original_price > product.price && (
@@ -347,18 +347,38 @@ export const FeaturedProducts = () => {
 
                     {/* Stock Status */}
                     <div className="mb-2 sm:mb-3">
-                      <div className={`text-xs font-medium ${
-                        product.stock_quantity > 10 
-                          ? 'text-green-600' 
-                          : product.stock_quantity > 5 
-                          ? 'text-yellow-600' 
-                          : 'text-red-600'
-                      }`}>
-                        {product.stock_quantity > 10 
-                          ? 'In Stock' 
-                          : product.stock_quantity > 0 
-                          ? `Only ${product.stock_quantity} left!` 
-                          : 'Out of Stock'}
+                      <div className="flex items-center justify-between text-xs font-medium px-2 py-1 rounded-md shadow-sm border border-gray-200 bg-white dark:bg-gray-800 dark:border-gray-700 transition-all duration-300 ease-in-out hover:shadow-md">
+                        <span className={`
+                          transition-colors duration-300
+                          ${product.stock_quantity > 10 
+                            ? 'text-green-600' 
+                            : product.stock_quantity > 5 
+                            ? 'text-yellow-600' 
+                            : 'text-red-600'}
+                        `}>
+                          {product.stock_quantity > 10
+                            ? 'In Stock'
+                            : product.stock_quantity > 0
+                            ? `Only ${product.stock_quantity} left!`
+                            : 'Out of Stock'}
+                        </span>
+
+                        <motion.a 
+                          href="tel:+256000000000" 
+                          className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-all duration-300"
+                          title="Call us"
+                          animate={{ 
+                            y: [0, -4, 0],
+                            scale: [1, 1.1, 1]
+                          }}
+                          transition={{ 
+                            repeat: Infinity,
+                            duration: 0.8,
+                            ease: "easeInOut"
+                          }}
+                        >
+                          <Phone className="w-4 h-4 text-orange-500 hover:text-blue-600 transition-colors duration-300" />
+                        </motion.a>
                       </div>
                     </div>
 
@@ -401,7 +421,7 @@ export const FeaturedProducts = () => {
         }
 
         .animate-float {
-          animation: float 3s ease-in-out infinite;
+          animation: float 1s ease-in-out infinite;
         }
 
         .line-clamp-2 {
