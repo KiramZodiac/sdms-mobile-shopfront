@@ -242,7 +242,8 @@ export default function ProductDetail() {
                 <video
                   src={product.video_url}
                   className="w-full h-full object-cover"
-                  muted
+                
+                  controls
                   preload="metadata"
                   loop
                 />

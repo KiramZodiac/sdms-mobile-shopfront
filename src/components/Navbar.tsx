@@ -69,13 +69,15 @@ export const Navbar = () => {
           <div className="flex items-center justify-between w-full flex-wrap gap-4">
             {/* Logo */}
             <a href="/" className="flex items-center space-x-2 flex-shrink-0">
-              <div className="w-8 h-8 lg:w-10 lg:h-10 bg-gradient-to-br from-blue-500 to-blue-700 rounded-full flex items-center justify-center shadow-md">
-                <span className="text-white font-extrabold text-base lg:text-lg">SDM</span>
-              </div>
-              <span className="text-base lg:text-sm font-semibold text-white  hidden lg:inline-block">
-                Electronics
-              </span>
-            </a>
+  <div className="flex flex-col items-center">
+    <div className="w-8 h-8 lg:w-10 lg:h-10 bg-gradient-to-br from-blue-500 to-blue-700 rounded-full flex items-center justify-center shadow-md">
+      <span className="text-white font-extrabold text-base lg:text-lg">SDM</span>
+    </div>
+    <span className="text-sm lg:text-sm font-semibold text-white mt-1">
+      Electronics
+    </span>
+  </div>
+</a>
 
             {/* Right side navigation items */}
             <div className="flex items-center space-x-2 lg:space-x-6 ml-auto">
@@ -106,7 +108,7 @@ export const Navbar = () => {
               <CartButton />
               <div className="bg-white/20 text-white px-3 py-1 rounded-full text-sm font-medium">
                 <span className="flex items-center space-x-1">
-                  <span>🇺🇬UG</span>
+                  <span className="text-2xl">🇺🇬</span>
                   <span className="hidden sm:inline">UGX</span>
                 </span>
               </div>
