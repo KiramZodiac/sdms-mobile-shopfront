@@ -23,7 +23,7 @@ interface Product {
   stock_quantity: number;
   is_active: boolean;
   is_featured: boolean;
-  is_preorder: boolean;
+  is_preorder?: boolean;
   preorder_availability_date?: string;
   preorder_description?: string;
   slug: string;

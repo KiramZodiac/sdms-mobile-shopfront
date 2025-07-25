@@ -310,6 +310,9 @@ export type Database = {
           stock_quantity: number | null
           updated_at: string | null
           view_count: number | null
+          is_preorder: boolean;
+          preorder_availability_date?: string | null;
+          is_preorder_availability_date?: string | null;
         }
         Insert: {
           category_id?: string | null

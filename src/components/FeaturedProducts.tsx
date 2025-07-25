@@ -1,12 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { Link } from "react-router-dom";
-import { Star, ShoppingCart, Eye, Heart, Zap, TrendingUp, Crown, Phone } from "lucide-react";
+import { TrendingUp, Crown } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { useCart } from "@/hooks/useCart";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
+import { ProductCard } from "./ProductCard";
 
 interface Product {
   view_count: number;
@@ -23,10 +23,7 @@ interface Product {
   slug: string;
   is_preorder: boolean;
   preorder_availability_date?: string;
-  categories?: {
-    name: string;
-    slug: string;
-  };
+  categories?: { name: string; slug: string };
 }
 
 const cardVariants = {
@@ -41,13 +38,20 @@ const cardVariants = {
 export const FeaturedProducts = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [hoveredProduct, setHoveredProduct] = useState<string | null>(null);
-  const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const { addToCart } = useCart();
   const { toast } = useToast();
 
   useEffect(() => {
-    fetchFeaturedProducts();
+    const cachedData = localStorage.getItem("featuredProducts");
+    const cacheTime = localStorage.getItem("featuredProductsTime");
+    const cacheDuration = 1000 * 60 * 10
+
+    if (cachedData && cacheTime && Date.now() - parseInt(cacheTime) < cacheDuration) {
+      setProducts(JSON.parse(cachedData));
+      setLoading(false);
+    } else {
+      fetchFeaturedProducts();
+    }
   }, []);
 
   const fetchFeaturedProducts = async () => {
@@ -76,6 +80,8 @@ export const FeaturedProducts = () => {
       })) || [];
 
       setProducts(transformedProducts);
+      localStorage.setItem("featuredProducts", JSON.stringify(transformedProducts));
+      localStorage.setItem("featuredProductsTime", Date.now().toString());
     } catch (error) {
       console.error("Error fetching featured products:", error);
       toast({
@@ -88,40 +94,21 @@ export const FeaturedProducts = () => {
     }
   };
 
-  const formatPrice = (price: number) =>
+  const formatPrice = (price: number): string =>
     new Intl.NumberFormat("en-UG", {
       style: "currency",
       currency: "UGX",
       minimumFractionDigits: 0,
     }).format(price);
 
-  const handleAddToCart = (product: Product) => {
-    addToCart({
-      id: product.id,
-      name: product.name,
-      price: product.price,
-      images: product.images,
-    });
-    
-    const actionText = product.is_preorder ? "Pre-ordered" : "Added to Cart";
-    const descriptionText = product.is_preorder 
-      ? `${product.name} has been added to your pre-orders`
-      : `${product.name} has been added to your cart`;
-    
-    toast({
-      title: actionText,
-      description: descriptionText,
-    });
-  };
-
-  const formatViewCount = (count: number) =>
+  const formatViewCount = (count: number): string =>
     count >= 1_000_000
       ? `${(count / 1_000_000).toFixed(1)}M`
       : count >= 1000
       ? `${(count / 1000).toFixed(1)}k`
       : count.toString();
 
-  const incrementViewCount = async (productId: string) => {
+  const incrementViewCount = async (productId: string): Promise<void> => {
     const viewedKey = `viewed-${productId}`;
     if (sessionStorage.getItem(viewedKey)) return;
 
@@ -136,61 +123,32 @@ export const FeaturedProducts = () => {
     }
   };
 
-  const toggleFavorite = (productId: string) => {
-    setFavorites(prev => {
-      const newFavorites = new Set(prev);
-      if (newFavorites.has(productId)) {
-        newFavorites.delete(productId);
-      } else {
-        newFavorites.add(productId);
-      }
-      return newFavorites;
-    });
-  };
+  const getDiscountPercentage = (original: number, current: number): number =>
+    Math.round(((original - current) / original) * 100);
 
-  const getDiscountPercentage = (original: number, current: number) => {
-    return Math.round(((original - current) / original) * 100);
-  };
-
-  const formatAvailabilityDate = (dateString?: string) => {
-    if (!dateString) return null;
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-UG', { 
-      year: 'numeric', 
-      month: 'short', 
-      day: 'numeric' 
-    });
-  };
+  const formatAvailabilityDate = (dateString?: string): string | null =>
+    dateString
+      ? new Date(dateString).toLocaleDateString("en-UG", {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+        })
+      : null;
 
   if (loading) {
     return (
-      <section className="py-16 bg-gradient-to-br from-orange-500 via-blue-900 to-indigo-900 relative overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_50%,rgba(120,119,198,0.3),transparent)] animate-pulse"></div>
-        
-        {/* Floating particles */}
-        <div className="absolute inset-0 pointer-events-none">
-          {[...Array(15)].map((_, i) => (
-            <div
-              key={i}
-              className="absolute w-2 h-2 bg-white/30 rounded-full animate-float"
-              style={{
-                left: `${Math.random() * 100}%`,
-                top: `${Math.random() * 100}%`,
-                animationDelay: `${Math.random() * 3}s`,
-                animationDuration: `${3 + Math.random() * 2}s`
-              }}
-            ></div>
-          ))}
-        </div>
-
-        <div className="container mx-auto px-4 relative z-10">
-          <div className="text-center mb-12">
-            <div className="h-8 bg-white/20 rounded-lg w-64 mx-auto mb-4 animate-pulse"></div>
-            <div className="h-6 bg-white/10 rounded-lg w-48 mx-auto animate-pulse"></div>
+      <section className="py-8 bg-gradient-to-br from-orange-500/50 to-indigo-900/50">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-8">
+            <div className="h-6 bg-white/20 rounded w-48 mx-auto mb-4 animate-pulse"></div>
+            <div className="h-4 bg-white/10 rounded w-32 mx-auto animate-pulse"></div>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
             {[...Array(12)].map((_, i) => (
-              <div key={i} className="bg-white/10 rounded-2xl h-80 animate-pulse backdrop-blur-sm"></div>
+              <div
+                key={i}
+                className="bg-white/10 rounded-lg h-64 animate-pulse"
+              ></div>
             ))}
           </div>
         </div>
@@ -199,268 +157,54 @@ export const FeaturedProducts = () => {
   }
 
   return (
-    <section className="bg-gradient-to-r from-white-400 to-orange-600 relative overflow-hidden">
-      {/* Animated Background Elements */}
-      <div className="absolute inset-0">
-        <div className="absolute top-20 left-10 w-72 h-72 bg-purple-500/20 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-20 right-10 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
-        <div className="absolute top-1/2 left-1/2 w-64 h-64 bg-indigo-500/20 rounded-full blur-3xl animate-pulse delay-2000"></div>
-      </div>
-
-      {/* Floating particles */}
-      <div className="absolute inset-0 pointer-events-none">
-        {[...Array(20)].map((_, i) => (
-          <div
-            key={i}
-            className="absolute w-2 h-2 bg-white/30 rounded-full animate-float"
-            style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
-              animationDelay: `${Math.random() * 3}s`,
-              animationDuration: `${3 + Math.random() * 2}s`
-            }}
-          ></div>
-        ))}
-      </div>
-
-      <div className="container mx-auto px-4 relative z-10">
-        {/* Header Section */}
+    <section className="py-8 bg-gradient-to-r from-white/50 to-orange-600/50">
+      <div className="container mx-auto px-4">
         <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="text-center mb-12 transform transition-all duration-700 hover:scale-105"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.3 }}
+          className="text-center mb-8"
         >
-          <div className="inline-flex items-center gap-2 bg-gradient-to-r from-yellow-400 to-orange-500 text-black px-6 py-2 rounded-full font-semibold text-sm mb-4 shadow-lg">
+          <div className="inline-flex items-center gap-2 bg-gradient-to-r from-yellow-400/80 to-orange-500/80 text-black px-4 py-1 rounded-full text-sm">
             <Crown className="w-4 h-4" />
-            <span className="animate-pulse">LIMITED TIME OFFERS</span>
+            LIMITED TIME OFFERS
           </div>
-          <h2 className="text-2xl md:text-5xl font-bold text-black mb-4 bg-gradient-to-r from-black via-blue-500 to-purple-200 bg-clip-text text-transparent">
-            Best Value, All Day | Top Rated Deals
+          <h2 className="text-xl md:text-3xl font-bold text-black my-2">
+            Best Value, All Day
           </h2>
-          <p className="text-xl text-blue-500 mb-6 max-w-2xl mx-auto">
-            Discover premium products at unbeatable prices
-          </p>
           <Link to="/products">
-            <Button 
-              variant="outline" 
-              size="lg" 
-              className="bg-white/10 backdrop-blur-sm text-orange-500 border-white/30 hover:bg-white/20 hover:scale-105 transition-all duration-300 shadow-lg"
+            <Button
+              variant="outline"
+              size="sm"
+              className="bg-white/10 text-orange-500 border-white/30 hover:bg-white/20"
             >
-              <span className="flex items-center gap-2">
-                View All Products
-                <TrendingUp className="w-5 h-5" />
-              </span>
+              View All Products
+              <TrendingUp className="w-4 h-4 ml-2" />
             </Button>
           </Link>
         </motion.div>
 
-        {/* Products Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
           <AnimatePresence>
-            {products.map((product, i) => (
-              <motion.div
-                key={product.id}
-                custom={i}
-                variants={cardVariants}
-                initial="hidden"
-                animate="visible"
-                exit="hidden"
-                className="group relative transform transition-all duration-500 hover:scale-105 hover:-translate-y-2"
-                onMouseEnter={() => setHoveredProduct(product.id)}
-                onMouseLeave={() => setHoveredProduct(null)}
-              >
-                {/* Product Card */}
-                <div className="relative bg-white/95 backdrop-blur-sm rounded-2xl overflow-hidden shadow-xl group-hover:shadow-2xl transition-all duration-500 border border-white/20 group-hover:border-purple-300/50">
-                  {/* Glow Effect */}
-                  <div className="absolute inset-0 bg-gradient-to-r from-purple-500/20 to-blue-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-                  
-                  {/* Image Container */}
-                  <div className="relative overflow-hidden">
-                    <Link
-                      to={`/products/${product.slug}`}
-                      onClick={() => incrementViewCount(product.id)}
-                      className="block group"
-                    >
-                      <img
-                        src={product.images?.[0] || "/placeholder.svg"}
-                        alt={product.name}
-                        className="w-full h-32 sm:h-36 md:h-40 object-cover transition-transform duration-700 group-hover:scale-105 rounded-md"
-                      />
-                    </Link>
-                    
-                    {/* Image Overlay */}
-                    <Link to={`/products/${product.slug}`} className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-500">
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-                    </Link>
-
-                    {/* Pre-order Badge */}
-                    {product.is_preorder && (
-                      <Badge className="absolute top-3 left-3 bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-lg">
-                        <span className="flex items-center gap-1 text-xs">
-                          <Zap className="w-3 h-3" />
-                          PRE-ORDER
-                        </span>
-                      </Badge>
-                    )}
-
-                    {/* Discount Badge */}
-                    {product.original_price && product.original_price > product.price && !product.is_preorder && (
-                      <Badge className="absolute top-3 left-3 bg-gradient-to-r from-red-500 to-pink-500 text-white shadow-lg animate-pulse">
-                        <span className="flex items-center gap-1">
-                          <Zap className="w-3 h-3" />
-                          {getDiscountPercentage(product.original_price, product.price)}% OFF
-                        </span>
-                      </Badge>
-                    )}
-
-                    {/* View Count */}
-                    <div className="absolute bottom-3 left-3 bg-black/70 backdrop-blur-sm text-white px-2 py-1 rounded-full text-xs flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
-                      <Eye className="w-3 h-3" />
-                      {formatViewCount(product.view_count)}
-                    </div>
-                  </div>
-
-                  {/* Product Info */}
-                  <div className="p-3 sm:p-4 relative z-10">
-                    <Link to={`/products/${product.slug}`}>
-                      <h3 className="text-xs sm:text-sm font-semibold text-gray-900 mb-2 line-clamp-2 group-hover:text-purple-800 transition-colors duration-300">
-                        {product.name}
-                      </h3>
-                    </Link>
-                    
-                    {/* Rating */}
-                    <div className="flex items-center gap-1 mb-2">
-                      <div className="flex items-center">
-                        {[...Array(5)].map((_, i) => (
-                          <Star
-                            key={i}
-                            className={`w-3 h-3 ${
-                              product.rating && i < Math.floor(product.rating)
-                                ? 'text-yellow-400 fill-current'
-                                : 'text-gray-300'
-                            }`}
-                          />
-                        ))}
-                      </div>
-                      {product.reviews_count! > 0 && (
-                        <span className="text-xs text-gray-600">({product.reviews_count})</span>
-                      )}
-                    </div>
-
-                    {/* Price */}
-                    <div className="mb-2 sm:mb-3">
-                      <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
-                        <span className="text-sm sm:text-base font-bold text-gray-900">
-                          {formatPrice(product.price)}
-                        </span>
-                        {product.original_price && (
-                          <span className="text-xs sm:text-sm text-gray-500 line-through">
-                            {formatPrice(product.original_price)}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Stock Status / Pre-order Info */}
-                    <div className="mb-2 sm:mb-3">
-                      <div className="flex items-center justify-between text-xs font-medium px-2 py-1 rounded-md shadow-sm border border-gray-200 bg-white dark:bg-gray-800 dark:border-gray-700 transition-all duration-300 ease-in-out hover:shadow-md">
-                        <span className={`
-                          transition-colors duration-300
-                          ${product.is_preorder
-                            ? 'text-blue-600'
-                            : product.stock_quantity > 10 
-                            ? 'text-green-600' 
-                            : product.stock_quantity > 5 
-                            ? 'text-yellow-600' 
-                            : 'text-red-600'}
-                        `}>
-                          {product.is_preorder
-                            ? product.preorder_availability_date
-                              ? `Available ${formatAvailabilityDate(product.preorder_availability_date)}`
-                              : 'Pre-order Available'
-                            : product.stock_quantity > 10
-                            ? 'In Stock'
-                            : product.stock_quantity > 0
-                            ? `Only ${product.stock_quantity} left!`
-                            : 'Out of Stock'}
-                        </span>
-
-                        <motion.a 
-                          href="tel:+256755869853" 
-                          className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-all duration-300"
-                          title="Call us"
-                          animate={{ 
-                            y: [0, -4, 0],
-                            scale: [1, 1.1, 1]
-                          }}
-                          transition={{ 
-                            repeat: Infinity,
-                            duration: 0.8,
-                            ease: "easeInOut"
-                          }}
-                        >
-                          <Phone className="w-4 h-4 text-orange-500 hover:text-blue-600 transition-colors duration-300" />
-                        </motion.a>
-                      </div>
-                    </div>
-
-                    {/* Action Button */}
-                    <button
-                      onClick={() => handleAddToCart(product)}
-                      disabled={product.stock_quantity === 0 && !product.is_preorder}
-                      className={`w-full py-2 px-2 sm:px-4 rounded-xl font-medium text-xs sm:text-sm transition-all duration-300 ${
-                        product.stock_quantity === 0 && !product.is_preorder
-                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                          : product.is_preorder
-                          ? 'bg-gradient-to-r from-blue-600 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-lg hover:shadow-xl transform hover:scale-105'
-                          : 'bg-gradient-to-r from-orange-600 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-lg hover:shadow-xl transform hover:scale-105'
-                      }`}
-                    >
-                      <span className="flex items-center justify-center gap-1 sm:gap-2">
-                        <ShoppingCart className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
-                        <span className="truncate">
-                          {product.stock_quantity === 0 && !product.is_preorder
-                            ? 'Out of Stock'
-                            : product.is_preorder
-                            ? 'Pre-order'
-                            : 'Add to Cart'
-                          }
-                        </span>
-                      </span>
-                    </button>
-                  </div>
-
-                  {/* Hover Effect Shine */}
-                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 pointer-events-none"></div>
-                </div>
-              </motion.div>
-            ))}
+            <Suspense fallback={<div>Loading...</div>}>
+              {products.map((product, i) => (
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  index={i}
+                  formatPrice={formatPrice}
+                  formatViewCount={formatViewCount}
+                  incrementViewCount={incrementViewCount}
+                  addToCart={addToCart}
+                  toast={toast}
+                  getDiscountPercentage={getDiscountPercentage}
+                  formatAvailabilityDate={formatAvailabilityDate}
+                />
+              ))}
+            </Suspense>
           </AnimatePresence>
         </div>
       </div>
-
-      <style>{`
-        @keyframes float {
-          0%, 100% {
-            transform: translateY(0px);
-          }
-          50% {
-            transform: translateY(-20px);
-          }
-        }
-
-        .animate-float {
-          animation: float 1s ease-in-out infinite;
-        }
-
-        .line-clamp-2 {
-          display: -webkit-box;
-          -webkit-line-clamp: 2;
-          -webkit-box-orient: vertical;
-          overflow: hidden;
-        }
-      `}</style>
     </section>
   );
 };
