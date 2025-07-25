@@ -31,7 +31,7 @@ export const Footer = () => {
             <h3 className="text-lg font-semibold mb-4">Quick Links</h3>
             <ul className="space-y-2">
               <li><Link to="/products" className="text-gray-400 hover:text-white transition-colors">All Products</Link></li>
-              <li><Link to="/products?category=smartphones" className="text-gray-400 hover:text-white transition-colors">Smartphones</Link></li>
+              <li><a href="/products?category=smartphones" className="text-gray-400 hover:text-white transition-colors">Smartphones</a></li>
               <li><Link to="/products?category=laptops" className="text-gray-400 hover:text-white transition-colors">Laptops</Link></li>
               <li><Link to="/products?category=audio" className="text-gray-400 hover:text-white transition-colors">Audio Devices</Link></li>
               <li><Link to="/products?category=wearables" className="text-gray-400 hover:text-white transition-colors">Wearables</Link></li>
@@ -42,11 +42,11 @@ export const Footer = () => {
           <div>
             <h3 className="text-lg font-semibold mb-4">Customer Service</h3>
             <ul className="space-y-2">
-              <li><Link to="/about" className="text-gray-400 hover:text-white transition-colors">About Us</Link></li>
-              <li><Link to="/contact" className="text-gray-400 hover:text-white transition-colors">Contact Us</Link></li>
-              <li><Link to="/shipping" className="text-gray-400 hover:text-white transition-colors">Shipping Info</Link></li>
+              <li><a href="/aboutUsPage" className="text-gray-400 hover:text-white transition-colors">About Us</a></li>
+              <li><a href="/ContactUsPage" className="text-gray-400 hover:text-white transition-colors">Contact Us</a></li>
+              {/* <li><Link to="/shipping" className="text-gray-400 hover:text-white transition-colors">Shipping Info</Link></li>
               <li><Link to="/returns" className="text-gray-400 hover:text-white transition-colors">Returns</Link></li>
-              <li><Link to="/faq" className="text-gray-400 hover:text-white transition-colors">FAQ</Link></li>
+              <li><Link to="/faq" className="text-gray-400 hover:text-white transition-colors">FAQ</Link></li> */}
             </ul>
           </div>
 
@@ -63,11 +63,11 @@ export const Footer = () => {
               </div>
               <div className="flex items-center space-x-3">
                 <Phone className="w-5 h-5 text-gray-400" />
-                <span className="text-gray-400">+256-XXX-XXXXX</span>
+                <span className="text-gray-400">+256755869853</span>
               </div>
               <div className="flex items-center space-x-3">
                 <Mail className="w-5 h-5 text-gray-400" />
-                <span className="text-gray-400">info@sdmelectronics.ug</span>
+                <span className="text-gray-400">sdmelectronics256@gmail.com</span>
               </div>
             </div>
           </div>
@@ -76,9 +76,8 @@ export const Footer = () => {
         {/* Bottom Bar */}
         <div className="border-t border-gray-800 mt-8 pt-8">
           <div className="flex flex-col md:flex-row justify-between items-center">
-            <p className="text-gray-400 text-sm">
-              © 2024 SDM Electronics. All rights reserved.
-            </p>
+          
+
             <div className="flex space-x-6 mt-4 md:mt-0">
               <Link to="/privacy" className="text-gray-400 hover:text-white text-sm transition-colors">
                 Privacy Policy
@@ -88,6 +87,12 @@ export const Footer = () => {
               </Link>
             </div>
           </div>
+          <p className="text-gray-400 text-sm">
+              © 2024 SDM Electronics. All rights reserved.
+            </p>
+            <footer className="text-center text-gray-500 text-sm py-4">
+  Created by <a href="https://kiram.netlify.app" className="text-blue-500 hover:underline">Akram Dev</a>
+</footer>
         </div>
       </div>
     </footer>

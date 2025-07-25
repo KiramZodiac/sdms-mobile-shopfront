@@ -15,7 +15,10 @@ import ProductDetail from "./pages/ProductDetail";
 import Checkout from "./pages/Checkout";
 import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
-import InstallPWA from "./InstallPWA";
+import ContactUsPage from "./pages/ContactUsPage";
+import AboutUsPage from "./pages/AboutUsPage";
+
+
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -46,6 +49,9 @@ const App = () => (
                 <Route path="products/new-arrivals" element={<Products />} />
                 <Route path="products/on-sale" element={<Products />} />
                 <Route path="products/:slug" element={<ProductDetail />} />
+              
+                <Route path="contactUsPage" element={<ContactUsPage />} />
+                <Route path="aboutUsPage" element={<AboutUsPage />} />
                 <Route path="checkout" element={<Checkout />} />
                 <Route path="*" element={<NotFound />} />
               </Route>

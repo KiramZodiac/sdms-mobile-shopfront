@@ -21,6 +21,8 @@ interface Product {
   rating?: number;
   reviews_count?: number;
   slug: string;
+  is_preorder: boolean;
+  preorder_availability_date?: string;
   categories?: {
     name: string;
     slug: string;
@@ -54,7 +56,8 @@ export const FeaturedProducts = () => {
         .from("products")
         .select(`
           id, name, price, original_price, description, short_description, 
-          images, stock_quantity, rating, reviews_count, slug, view_count, 
+          images, stock_quantity, rating, reviews_count, slug, view_count,
+          is_preorder, preorder_availability_date,
           categories(name, slug)
         `)
         .eq("is_active", true)
@@ -69,6 +72,7 @@ export const FeaturedProducts = () => {
         description: product.description || product.short_description || "",
         images: product.images || [],
         view_count: product.view_count || 0,
+        is_preorder: product.is_preorder || false,
       })) || [];
 
       setProducts(transformedProducts);
@@ -98,9 +102,15 @@ export const FeaturedProducts = () => {
       price: product.price,
       images: product.images,
     });
+    
+    const actionText = product.is_preorder ? "Pre-ordered" : "Added to Cart";
+    const descriptionText = product.is_preorder 
+      ? `${product.name} has been added to your pre-orders`
+      : `${product.name} has been added to your cart`;
+    
     toast({
-      title: "Added to Cart",
-      description: `${product.name} has been added to your cart`,
+      title: actionText,
+      description: descriptionText,
     });
   };
 
@@ -140,6 +150,16 @@ export const FeaturedProducts = () => {
 
   const getDiscountPercentage = (original: number, current: number) => {
     return Math.round(((original - current) / original) * 100);
+  };
+
+  const formatAvailabilityDate = (dateString?: string) => {
+    if (!dateString) return null;
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-UG', { 
+      year: 'numeric', 
+      month: 'short', 
+      day: 'numeric' 
+    });
   };
 
   if (loading) {
@@ -273,22 +293,19 @@ export const FeaturedProducts = () => {
                     <Link to={`/products/${product.slug}`} className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-500">
                     <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
                     </Link>
-                    {/* Favorite Button */}
-                    {/* <button
-                      onClick={() => toggleFavorite(product.id)}
-                      className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center transition-all duration-300 hover:scale-110 hover:bg-white shadow-lg"
-                    >
-                      <Heart 
-                        className={`w-4 h-4 transition-colors duration-300 ${
-                          favorites.has(product.id) 
-                            ? 'text-red-500 fill-current' 
-                            : 'text-gray-600 hover:text-red-500'
-                        }`}
-                      />
-                    </button> */}
+
+                    {/* Pre-order Badge */}
+                    {product.is_preorder && (
+                      <Badge className="absolute top-3 left-3 bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-lg">
+                        <span className="flex items-center gap-1 text-xs">
+                          <Zap className="w-3 h-3" />
+                          PRE-ORDER
+                        </span>
+                      </Badge>
+                    )}
 
                     {/* Discount Badge */}
-                    {product.original_price && product.original_price > product.price && (
+                    {product.original_price && product.original_price > product.price && !product.is_preorder && (
                       <Badge className="absolute top-3 left-3 bg-gradient-to-r from-red-500 to-pink-500 text-white shadow-lg animate-pulse">
                         <span className="flex items-center gap-1">
                           <Zap className="w-3 h-3" />
@@ -345,18 +362,24 @@ export const FeaturedProducts = () => {
                       </div>
                     </div>
 
-                    {/* Stock Status */}
+                    {/* Stock Status / Pre-order Info */}
                     <div className="mb-2 sm:mb-3">
                       <div className="flex items-center justify-between text-xs font-medium px-2 py-1 rounded-md shadow-sm border border-gray-200 bg-white dark:bg-gray-800 dark:border-gray-700 transition-all duration-300 ease-in-out hover:shadow-md">
                         <span className={`
                           transition-colors duration-300
-                          ${product.stock_quantity > 10 
+                          ${product.is_preorder
+                            ? 'text-blue-600'
+                            : product.stock_quantity > 10 
                             ? 'text-green-600' 
                             : product.stock_quantity > 5 
                             ? 'text-yellow-600' 
                             : 'text-red-600'}
                         `}>
-                          {product.stock_quantity > 10
+                          {product.is_preorder
+                            ? product.preorder_availability_date
+                              ? `Available ${formatAvailabilityDate(product.preorder_availability_date)}`
+                              : 'Pre-order Available'
+                            : product.stock_quantity > 10
                             ? 'In Stock'
                             : product.stock_quantity > 0
                             ? `Only ${product.stock_quantity} left!`
@@ -364,7 +387,7 @@ export const FeaturedProducts = () => {
                         </span>
 
                         <motion.a 
-                          href="tel:+256000000000" 
+                          href="tel:+256755869853" 
                           className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-all duration-300"
                           title="Call us"
                           animate={{ 
@@ -385,17 +408,24 @@ export const FeaturedProducts = () => {
                     {/* Action Button */}
                     <button
                       onClick={() => handleAddToCart(product)}
-                      disabled={product.stock_quantity === 0}
+                      disabled={product.stock_quantity === 0 && !product.is_preorder}
                       className={`w-full py-2 px-2 sm:px-4 rounded-xl font-medium text-xs sm:text-sm transition-all duration-300 ${
-                        product.stock_quantity === 0
+                        product.stock_quantity === 0 && !product.is_preorder
                           ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                          : product.is_preorder
+                          ? 'bg-gradient-to-r from-blue-600 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-lg hover:shadow-xl transform hover:scale-105'
                           : 'bg-gradient-to-r from-orange-600 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-lg hover:shadow-xl transform hover:scale-105'
                       }`}
                     >
                       <span className="flex items-center justify-center gap-1 sm:gap-2">
                         <ShoppingCart className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
                         <span className="truncate">
-                          {product.stock_quantity === 0 ? 'Out of Stock' : 'Add to Cart'}
+                          {product.stock_quantity === 0 && !product.is_preorder
+                            ? 'Out of Stock'
+                            : product.is_preorder
+                            ? 'Pre-order'
+                            : 'Add to Cart'
+                          }
                         </span>
                       </span>
                     </button>

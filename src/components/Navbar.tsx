@@ -1,11 +1,22 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Search, Home, ShoppingBag } from "lucide-react";
 import { CartButton } from "./CartButton";
 import { useNavigate } from "react-router-dom";
 
 export const Navbar = () => {
   const [searchQuery, setSearchQuery] = useState("");
+  const [isScrolled, setIsScrolled] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollTop = window.scrollY;
+      setIsScrolled(scrollTop > 100); // Hide other parts when scrolled more than 100px
+    };
+
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -66,18 +77,38 @@ export const Navbar = () => {
       {/* Main Navigation */}
       <nav className="bg-gradient-to-r from-orange-500 to-orange-600 shadow-md">
         <div className="container mx-auto px-4 lg:px-8 py-3">
-          <div className="flex items-center justify-between w-full flex-wrap gap-4">
-            {/* Logo */}
-            <a href="/" className="flex items-center space-x-2 flex-shrink-0">
-  <div className="flex flex-col items-center">
-    <div className="w-8 h-8 lg:w-10 lg:h-10 bg-gradient-to-br from-blue-500 to-blue-700 rounded-full flex items-center justify-center shadow-md">
-      <span className="text-white font-extrabold text-base lg:text-lg">SDM</span>
-    </div>
-    <span className="text-sm lg:text-sm font-semibold text-white mt-1">
-      Electronics
-    </span>
-  </div>
-</a>
+          <div
+            className={`flex items-center justify-between w-full flex-wrap gap-4 transition-all duration-300 ${
+              isScrolled ? "max-h-0 opacity-0 py-0 overflow-hidden" : "max-h-20 opacity-100"
+            }`}
+          >
+            {/* Logo with Image */}
+            <a href="/" className="flex items-center space-x-3 flex-shrink-0">
+              <img 
+                src="./sdmlogo.png" 
+                alt="SDM Electronics Logo" 
+                className="w-12 h-12 lg:w-16 lg:h-16 object-contain rounded-lg shadow-md bg-white/10 p-1"
+                onError={(e) => {
+                  // Fallback to text logo if image fails to load
+                  // e.target.style.display = 'none';
+                  // e.target.nextElementSibling.style.display = 'flex';
+                }}
+              />
+              {/* Fallback text logo (hidden by default) */}
+              <div className="hidden flex-col items-center">
+                <div className="w-12 h-12 lg:w-16 lg:h-16 bg-gradient-to-br from-blue-500 to-blue-700 rounded-full flex items-center justify-center shadow-md">
+                  <span className="text-white font-extrabold text-lg lg:text-xl">SDM</span>
+                </div>
+              </div>
+              {/* <div className="flex flex-col">
+                <span className="text-lg lg:text-xl font-bold text-white">
+                  SDM Electronics
+                </span>
+                <span className="text-xs lg:text-sm text-white/80">
+                  Quality Electronics
+                </span>
+              </div> */}
+            </a>
 
             {/* Right side navigation items */}
             <div className="flex items-center space-x-2 lg:space-x-6 ml-auto">
@@ -91,11 +122,11 @@ export const Navbar = () => {
                 href="/"
                 className="text-white/90 hover:text-white font-medium transition-colors sm:hidden p-1 rounded-full hover:bg-gray-100"
               >
-                <Home className="w-4 h-4 lg:w-5 lg:h-5" />
+                {/* <Home className="w-4 h-4 lg:w-5 lg:h-5" /> */}
               </a>
               <a
                 href="/products"
-                className="text-white/90 hover:text-white font-medium transition-colors text-sm lg:text-base hidden sm:block"
+                className=" max-sm:hidden text-white/90 hover:text-white font-medium transition-colors text-sm lg:text-base hidden sm:block"
               >
                 Products
               </a>
@@ -103,7 +134,7 @@ export const Navbar = () => {
                 href="/products"
                 className="text-white/90 hover:text-white font-medium transition-colors sm:hidden p-1 rounded-full hover:bg-gray-100"
               >
-                <ShoppingBag className="w-4 h-4 lg:w-5 lg:h-5" />
+                {/* <ShoppingBag className="w-4 h-4 lg:w-5 lg:h-5" /> */}
               </a>
               <CartButton />
               <div className="bg-white/20 text-white px-3 py-1 rounded-full text-sm font-medium">
@@ -116,20 +147,25 @@ export const Navbar = () => {
           </div>
 
           {/* Search bar */}
-          <form onSubmit={handleSearch} className="mt-4 flex w-full relative">
-            <input
-              type="text"
-              placeholder="Search for electronics..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full rounded-full bg-white text-gray-800 px-4 py-2 pr-12 focus:ring-2 focus:ring-blue-500 placeholder-gray-500 text-sm lg:text-base outline-none"
-            />
-            <button
-              type="submit"
-              className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-600 hover:text-orange-600 transition-colors p-1 rounded-full hover:bg-gray-100"
-            >
-              <Search className="w-4 h-4 lg:w-5 lg:h-5" />
-            </button>
+          <form onSubmit={handleSearch} className={`flex w-full relative transition-all duration-300 ${
+            isScrolled ? "mt-2" : "mt-4"
+          }`}>
+            <div className="relative w-full max-w-2xl mx-auto">
+              <input
+                type="text"
+                placeholder="Search for electronics..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full h-11 rounded-lg bg-white/95 backdrop-blur-sm text-gray-800 px-4 pl-12 pr-4 focus:ring-2 focus:ring-white/30 focus:bg-white placeholder-gray-500 text-sm lg:text-base outline-none shadow-lg border border-white/20 transition-all duration-200"
+              />
+              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-4 h-4 lg:w-5 lg:h-5 text-gray-500" />
+              <button
+                type="submit"
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-orange-600 hover:bg-orange-700 text-white px-3 py-1.5 rounded-md transition-colors text-sm font-medium shadow-md"
+              >
+                Search
+              </button>
+            </div>
           </form>
         </div>
       </nav>

@@ -23,6 +23,9 @@ interface Product {
   stock_quantity: number;
   is_active: boolean;
   is_featured: boolean;
+  is_preorder: boolean;
+  preorder_availability_date?: string;
+  preorder_description?: string;
   slug: string;
   sku?: string;
   category_id?: string;
@@ -53,10 +56,10 @@ export const ProductForm = ({ product, categories, onClose, onSave }: ProductFor
     stock_quantity: 0,
     is_active: true,
     is_featured: false,
+    is_preorder: false,
     slug: '',
     sku: '',
     features: [],
-    
   });
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -89,6 +92,11 @@ export const ProductForm = ({ product, categories, onClose, onSave }: ProductFor
         if (!prev.sku) {
           updated.sku = generateSKU(value);
         }
+      }
+      // If switching from preorder to regular product, clear preorder fields
+      if (field === 'is_preorder' && !value) {
+        updated.preorder_availability_date = undefined;
+        updated.preorder_description = undefined;
       }
       return updated;
     });
@@ -190,6 +198,9 @@ export const ProductForm = ({ product, categories, onClose, onSave }: ProductFor
           ? JSON.parse(cleanFormData.specifications)
           : null,
         features: cleanFormData.features || [],
+        is_preorder: cleanFormData.is_preorder,
+        preorder_availability_date: cleanFormData.preorder_availability_date || null,
+        preorder_description: cleanFormData.preorder_description || null,
       };
   
       console.log('Submitting productData:', JSON.stringify(productData, null, 2));
@@ -230,6 +241,13 @@ export const ProductForm = ({ product, categories, onClose, onSave }: ProductFor
     } finally {
       setLoading(false);
     }
+  };
+
+  // Format date for input field (YYYY-MM-DD)
+  const formatDateForInput = (dateString?: string) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toISOString().split('T')[0];
   };
   
   return (
@@ -343,6 +361,46 @@ export const ProductForm = ({ product, categories, onClose, onSave }: ProductFor
               rows={4}
               placeholder="Enter features separated by commas (e.g., Feature 1, Feature 2)"
             />
+          </div>
+
+          {/* Pre-order Section */}
+          <div className="space-y-4 border-t pt-4">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="is_preorder"
+                checked={formData.is_preorder}
+                onCheckedChange={(checked) => handleInputChange('is_preorder', checked)}
+              />
+              <Label htmlFor="is_preorder" className="text-base font-medium">
+                This is a pre-order item
+              </Label>
+            </div>
+
+            {formData.is_preorder && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 ml-6 p-4 bg-gray-50 rounded-lg">
+                <div className="space-y-2">
+                  <Label htmlFor="preorder_availability_date">Expected Availability Date</Label>
+                  <Input
+                    id="preorder_availability_date"
+                    type="date"
+                    value={formatDateForInput(formData.preorder_availability_date)}
+                    onChange={(e) => handleInputChange('preorder_availability_date', e.target.value)}
+                    min={new Date().toISOString().split('T')[0]}
+                  />
+                </div>
+
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="preorder_description">Pre-order Information</Label>
+                  <Textarea
+                    id="preorder_description"
+                    value={formData.preorder_description || ''}
+                    onChange={(e) => handleInputChange('preorder_description', e.target.value)}
+                    rows={3}
+                    placeholder="Additional information about the pre-order (e.g., shipping details, expected delivery time, etc.)"
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="space-y-4">
