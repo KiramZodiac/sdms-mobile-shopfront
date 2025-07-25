@@ -5,7 +5,8 @@ import ErrorBoundary from './components/ErrorBoundary.tsx'
 import './index.css'
 import { BrowserRouter } from 'react-router-dom';
 import ScrollToTop from './components/ScrollToTop.tsx';
-import { Analytics } from "@vercel/analytics/next"
+import { Analytics } from '@vercel/analytics/react';
+import { SpeedInsights } from "@vercel/speed-insights/react"
 
 createRoot(document.getElementById("root")!).render(
   <BrowserRouter>
@@ -13,6 +14,8 @@ createRoot(document.getElementById("root")!).render(
   <ErrorBoundary>
     <App />
     <Analytics />
+    <SpeedInsights />
+    
   </ErrorBoundary>
   </BrowserRouter>
 );

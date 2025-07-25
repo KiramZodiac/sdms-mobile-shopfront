@@ -5,7 +5,6 @@ import { componentTagger } from "lovable-tagger";
 import { VitePWA } from "vite-plugin-pwa";
 
 export default defineConfig(({ mode }) => ({
-  
   server: {
     host: "::",
     port: 8080,
@@ -19,8 +18,10 @@ export default defineConfig(({ mode }) => ({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'robots.txt', 'apple-touch-icon.png'],
-      
-    })
+      workbox: {
+        globIgnores: ['**/node_modules/@vercel/analytics/dist/next/**'],
+      },
+    }),
   ].filter(Boolean),
   resolve: {
     alias: {
