@@ -113,42 +113,44 @@ const MobileBottomNavigation = () => {
         </div>
 
         {/* Categories List */}
-        <div className="p-4">
-          {loading ? (
-            <p className="text-gray-500">Loading categories...</p>
-          ) : (
-            <div className="space-y-2">
-              {categories.map((category) => (
-                <button
-                  key={category.id}
-                  className="w-full flex items-center justify-between p-3 rounded-lg hover:bg-gray-100 transition-colors duration-200 text-left"
-                  onClick={() => {
-                    navigate(`/products?category=${category.name.toLowerCase()}`);
-                    setActiveTab('categories');
-                    setSidebarOpen(false);
-                  }}
-                  role="menuitem"
-                  aria-label={`View ${category.name} category`}
-                >
-                  <div className="flex items-center">
-                    <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center mr-3 overflow-hidden">
-                      <img 
-                        src={category.image_url} 
-                        alt={category.name}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    <div>
-                      <p className="font-medium text-gray-900">{category.name}</p>
-                      <p className="text-sm text-gray-500">{category.count} items</p>
-                    </div>
-                  </div>
-                  <FontAwesomeIcon icon={faChevronRight} className="text-gray-400" />
-                </button>
-              ))}
+        <div className="p-4 max-h-[calc(100vh-100px)] overflow-y-auto">
+  {loading ? (
+    <p className="text-gray-500">Loading categories...</p>
+  ) : (
+    <div className="space-y-2">
+      {categories.map((category) => (
+        <button
+          key={category.id}
+          className="w-full flex items-center justify-between p-3 rounded-lg hover:bg-gray-100 transition-colors duration-200 text-left"
+          onClick={() => {
+            navigate(`/products?category=${category.name.toLowerCase()}`);
+            setActiveTab('categories');
+            setSidebarOpen(false);
+          }}
+          role="menuitem"
+          aria-label={`View ${category.name} category`}
+        >
+          <div className="flex items-center">
+            <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center mr-3 overflow-hidden">
+              <img 
+                src={category.image_url} 
+                alt={category.name}
+                className="w-full h-full object-cover"
+              />
             </div>
-          )}
-        </div>
+            <div>
+              <p className="font-medium text-gray-900">{category.name}</p>
+              <p className="text-sm text-gray-500">{category.count} items</p>
+            </div>
+          </div>
+          <FontAwesomeIcon icon={faChevronRight} className="text-gray-400" />
+        </button>
+      ))}
+    </div>
+  )}
+</div>
+
+
 
         {/* Sidebar Footer */}
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200 bg-gray-50">

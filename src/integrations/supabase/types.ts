@@ -417,7 +417,7 @@ export type Database = {
         | "shipped"
         | "delivered"
         | "cancelled"
-      payment_method: "whatsapp" | "cash_on_delivery" | "bank_transfer"
+      payment_method: "whatsapp" | "cash_on_delivery" | "bank_transfer" | "mobile_money"
     }
     CompositeTypes: {
       [_ in never]: never
