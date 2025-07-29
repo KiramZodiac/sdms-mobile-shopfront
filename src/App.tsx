@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -18,8 +17,6 @@ import NotFound from "./pages/NotFound";
 import ContactUsPage from "./pages/ContactUsPage";
 import AboutUsPage from "./pages/AboutUsPage";
 
-
-
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -35,35 +32,36 @@ const App = () => (
       <TooltipProvider>
         <AdminAuthProvider>
           <CartProvider>
-            <Toaster />
-           
-            <Sonner />
-            <Routes>
-              <Route path="/" element={<Layout />}>
-                <Route index element={<Index />} />
-                <Route path="products" element={<Products />} />
-                <Route path="products/category/:category" element={<Products />} />
-                <Route path="products/search/:query" element={<Products />} />
-                <Route path="products/featured" element={<Products />} />
-                <Route path="products/top-rated" element={<Products />} />
-                <Route path="products/new-arrivals" element={<Products />} />
-                <Route path="products/on-sale" element={<Products />} />
-                <Route path="products/:slug" element={<ProductDetail />} />
-              
-                <Route path="contactUsPage" element={<ContactUsPage />} />
-                <Route path="aboutUsPage" element={<AboutUsPage />} />
-                <Route path="checkout" element={<Checkout />} />
-                <Route path="*" element={<NotFound />} />
-              </Route>
-              <Route 
-                path="/admin" 
-                element={
-                  <ProtectedRoute>
-                    <Admin />
-                  </ProtectedRoute>
-                } 
-              />
-            </Routes>
+            
+              <Toaster />
+              <Sonner />
+              <Routes>
+                <Route path="/" element={<Layout />}>
+                  <Route index element={<Index />} />
+                  <Route path="products" element={<Products />} />
+                  <Route path="products/category/:category" element={<Products />} />
+                  <Route path="products/search/:query" element={<Products />} />
+                  <Route path="products/featured" element={<Products />} />
+                  <Route path="products/top-rated" element={<Products />} />
+                  <Route path="products/new-arrivals" element={<Products />} />
+                  <Route path="products/on-sale" element={<Products />} />
+                  <Route path="products/:slug" element={<ProductDetail />} />
+                  <Route path="contactUsPage" element={<ContactUsPage />} />
+                  <Route path="aboutUsPage" element={<AboutUsPage />} />
+                  <Route path="checkout" element={<Checkout />} />
+                  <Route path="*" element={<NotFound />} />
+                </Route>
+
+                <Route
+                  path="/admin"
+                  element={
+                    <ProtectedRoute>
+                      <Admin />
+                    </ProtectedRoute>
+                  }
+                />
+              </Routes>
+            
           </CartProvider>
         </AdminAuthProvider>
       </TooltipProvider>

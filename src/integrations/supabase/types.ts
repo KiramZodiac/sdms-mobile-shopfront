@@ -80,6 +80,42 @@ export type Database = {
         }
         Relationships: []
       }
+      CarouselImage: {
+       row: {
+        id: string;
+        title: string;
+        alt_text: string;
+        image_url: string;
+        display_order: number;
+        is_active: boolean;
+        created_at: string;
+        updated_at: string;
+
+
+       }
+        insert: {
+          id?: string;
+          title: string;
+          alt_text: string;
+          image_url: string;
+          display_order?: number;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        }
+        update: {
+          id?: string;
+          title?: string;
+          alt_text?: string;
+          image_url?: string;
+          display_order?: number;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        }
+        Relationships: []
+      }
+
       categories: {
         Row: {
           created_at: string | null

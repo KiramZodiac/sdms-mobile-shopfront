@@ -1,149 +1,542 @@
-
-import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
+import { useState, useEffect, createContext, useContext, ReactNode, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { useLocation } from 'react-router-dom';
+
+// Constants
+const ADMIN_ROUTE_PREFIX = '/Admin' as const;
+const AUTH_CHECK_TIMEOUT = 10000; // 10 seconds
+const ADMIN_SESSION_KEY = 'admin_session_data';
+const ADMIN_AUTO_LOGIN_KEY = 'admin_auto_login';
 
 interface AdminUser {
   id: string;
   email: string;
   role: string;
   is_active: boolean;
+  created_at: string;
+}
+
+interface AuthError {
+  code: string;
+  message: string;
+}
+
+interface SignInResult {
+  success: boolean;
+  error?: AuthError;
+}
+
+interface AdminSessionData {
+  user: AdminUser;
+  lastActivity: number;
+  autoLogin: boolean;
 }
 
 interface AdminAuthContextType {
   admin: AdminUser | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<{ error?: string }>;
+  signingIn: boolean;
+  signIn: (email: string, password: string, rememberMe?: boolean) => Promise<SignInResult>;
   signOut: () => Promise<void>;
+  refreshAdmin: () => Promise<void>;
+  isAutoLoginEnabled: boolean;
+  clearPersistentSession: () => void;
+  error: string | null;
 }
 
 const AdminAuthContext = createContext<AdminAuthContextType | undefined>(undefined);
 
+/**
+ * Admin Authentication Provider with Persistent Session Management
+ * Manages admin user authentication state and provides auth methods with persistent login
+ */
 export const AdminAuthProvider = ({ children }: { children: ReactNode }) => {
   const [admin, setAdmin] = useState<AdminUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [signingIn, setSigningIn] = useState(false);
+  const [isAutoLoginEnabled, setIsAutoLoginEnabled] = useState(false);
   const { toast } = useToast();
-  const location = useLocation();
 
-  useEffect(() => {
-    // Check if user is already logged in
-    const checkAuth = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-          // Check if user is an admin
-          const { data: adminData } = await supabase
-            .from('admin_users')
-            .select('*')
-            .eq('id', session.user.id)
-            .eq('is_active', true)
-            .single();
+  /**
+   * Validates email format
+   */
+  const isValidEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
 
-          if (adminData) {
-            setAdmin(adminData);
-          }
+  /**
+   * Saves admin session data to localStorage for persistence
+   */
+  const saveAdminSession = useCallback((adminData: AdminUser, autoLogin: boolean = false) => {
+    try {
+      const sessionData: AdminSessionData = {
+        user: adminData,
+        lastActivity: Date.now(),
+        autoLogin
+      };
+      localStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify(sessionData));
+      if (autoLogin) {
+        localStorage.setItem(ADMIN_AUTO_LOGIN_KEY, 'true');
+      }
+      setIsAutoLoginEnabled(autoLogin);
+    } catch (error) {
+      console.error('Failed to save admin session:', error);
+    }
+  }, []);
+
+  /**
+   * Retrieves admin session data from localStorage
+   */
+  const getStoredAdminSession = useCallback((): AdminSessionData | null => {
+    try {
+      const storedData = localStorage.getItem(ADMIN_SESSION_KEY);
+      if (!storedData) return null;
+
+      const sessionData: AdminSessionData = JSON.parse(storedData);
+      
+      // Check if session is still valid (24 hours)
+      const twentyFourHours = 24 * 60 * 60 * 1000;
+      if (Date.now() - sessionData.lastActivity > twentyFourHours) {
+        clearPersistentSession();
+        return null;
+      }
+
+      return sessionData;
+    } catch (error) {
+      console.error('Failed to retrieve admin session:', error);
+      clearPersistentSession();
+      return null;
+    }
+  }, []);
+
+  /**
+   * Clears persistent session data
+   */
+  const clearPersistentSession = useCallback(() => {
+    try {
+      localStorage.removeItem(ADMIN_SESSION_KEY);
+      localStorage.removeItem(ADMIN_AUTO_LOGIN_KEY);
+      setIsAutoLoginEnabled(false);
+    } catch (error) {
+      console.error('Failed to clear persistent session:', error);
+    }
+  }, []);
+
+  /**
+   * Updates last activity timestamp for session management
+   */
+  const updateLastActivity = useCallback(() => {
+    try {
+      const storedData = localStorage.getItem(ADMIN_SESSION_KEY);
+      if (storedData) {
+        const sessionData: AdminSessionData = JSON.parse(storedData);
+        sessionData.lastActivity = Date.now();
+        localStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify(sessionData));
+      }
+    } catch (error) {
+      console.error('Failed to update last activity:', error);
+    }
+  }, []);
+
+  /**
+   * Fetches admin user data from database
+   */
+  const fetchAdminData = useCallback(async (userId: string): Promise<AdminUser | null> => {
+    try {
+      const { data: adminData, error } = await supabase
+        .from('admin_users')
+        .select('id, email, role, is_active, created_at')
+        .eq('id', userId)
+        .eq('is_active', true)
+        .single();
+
+      if (error) {
+        console.error('Failed to fetch admin data:', error);
+        return null;
+      }
+
+      return adminData;
+    } catch (error) {
+      console.error('Exception fetching admin data:', error);
+      return null;
+    }
+  }, []);
+
+  /**
+   * Refreshes current admin data and updates stored session
+   */
+  const refreshAdmin = useCallback(async (): Promise<void> => {
+    if (!admin?.id) return;
+
+    const updatedAdmin = await fetchAdminData(admin.id);
+    if (updatedAdmin) {
+      setAdmin(updatedAdmin);
+      // Update stored session with fresh data
+      const sessionData = getStoredAdminSession();
+      if (sessionData) {
+        saveAdminSession(updatedAdmin, sessionData.autoLogin);
+      }
+    } else {
+      // Admin no longer exists or is inactive
+      await signOut();
+    }
+  }, [admin?.id, fetchAdminData, getStoredAdminSession, saveAdminSession]);
+
+  /**
+   * Attempts to restore session from stored data
+   */
+  const attemptSessionRestore = useCallback(async (): Promise<boolean> => {
+    const sessionData = getStoredAdminSession();
+    if (!sessionData) return false;
+
+    try {
+      // Verify the session is still valid with Supabase
+      const { data: { session }, error } = await supabase.auth.getSession();
+      
+      if (error || !session?.user) {
+        // Supabase session is invalid, but we have stored data
+        // Try to restore if auto-login is enabled
+        if (sessionData.autoLogin) {
+          setAdmin(sessionData.user);
+          updateLastActivity();
+          return true;
         }
-      } catch (error) {
-        console.error('Auth check error:', error);
-      } finally {
+        clearPersistentSession();
+        return false;
+      }
+
+      // Verify the stored user data is still valid
+      const freshAdminData = await fetchAdminData(session.user.id);
+      if (freshAdminData) {
+        setAdmin(freshAdminData);
+        saveAdminSession(freshAdminData, sessionData.autoLogin);
+        updateLastActivity();
+        return true;
+      } else {
+        clearPersistentSession();
+        return false;
+      }
+    } catch (error) {
+      console.error('Session restore failed:', error);
+      clearPersistentSession();
+      return false;
+    }
+  }, []);
+
+  /**
+   * Checks current authentication status
+   */
+  const checkAuthStatus = useCallback(async (): Promise<void> => {
+    console.log('checkAuthStatus called');
+    try {
+      // First, try to restore from stored session
+      const sessionRestored = await attemptSessionRestore();
+      if (sessionRestored) {
         setLoading(false);
+        return;
       }
-    };
 
-    checkAuth();
+      // If no stored session, check Supabase session
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Auth check timeout')), AUTH_CHECK_TIMEOUT)
+      );
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (event === 'SIGNED_OUT') {
-          setAdmin(null);
-        } else if (event === 'SIGNED_IN' && session) {
-          // Check if user is an admin
-          const { data: adminData } = await supabase
-            .from('admin_users')
-            .select('*')
-            .eq('id', session.user.id)
-            .eq('is_active', true)
-            .single();
+      const authPromise = supabase.auth.getSession();
+      
+      const { data: { session }, error } = await Promise.race([
+        authPromise,
+        timeoutPromise
+      ]) as any;
 
-          if (adminData) {
-            setAdmin(adminData);
-          }
+      if (error) {
+        console.error('Session check error:', error);
+        return;
+      }
+
+      if (session?.user) {
+        const adminData = await fetchAdminData(session.user.id);
+        if (adminData) {
+          setAdmin(adminData);
+          // Save session without auto-login by default
+          saveAdminSession(adminData, false);
         }
       }
-    );
+    } catch (error) {
+      console.error('Auth check failed:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  /**
+   * Handles authentication state changes
+   */
+  const handleAuthStateChange = useCallback(async (event: string, session: any) => {
+    console.log('handleAuthStateChange called:', event);
+    switch (event) {
+      case 'SIGNED_OUT':
+        setAdmin(null);
+        clearPersistentSession();
+        break;
+        
+      case 'SIGNED_IN':
+        if (session?.user) {
+          const adminData = await fetchAdminData(session.user.id);
+          if (adminData) {
+            setAdmin(adminData);
+            // Preserve auto-login setting from stored session or default to false
+            const storedSession = getStoredAdminSession();
+            const autoLogin = storedSession?.autoLogin || false;
+            saveAdminSession(adminData, autoLogin);
+          } else {
+            // User signed in but is not an admin
+            await supabase.auth.signOut();
+          }
+        }
+        break;
+        
+      case 'TOKEN_REFRESHED':
+        // Update last activity on token refresh
+        updateLastActivity();
+        if (session?.user && admin) {
+          await refreshAdmin();
+        }
+        break;
+    }
+  }, []);
+
+  // Initialize auth state and listener
+  useEffect(() => {
+    checkAuthStatus();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(handleAuthStateChange);
 
     return () => subscription.unsubscribe();
   }, []);
 
-  // Automatically logout when user leaves the admin page
+  // Set up activity tracking for session management
   useEffect(() => {
-    // Only run this effect if the user is currently logged in as admin
     if (!admin) return;
 
-    // If the current path does not start with /Admin, log out
-    if (!location.pathname.startsWith('/Admin')) {
-      signOut();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.pathname]);
+    const activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
+    let activityTimeout: NodeJS.Timeout;
 
-  const signIn = async (email: string, password: string): Promise<{ error?: string }> => {
+    const handleActivity = () => {
+      clearTimeout(activityTimeout);
+      activityTimeout = setTimeout(() => {
+        updateLastActivity();
+      }, 60000); // Update every minute of activity
+    };
+
+    activityEvents.forEach(event => {
+      document.addEventListener(event, handleActivity, true);
+    });
+
+    return () => {
+      clearTimeout(activityTimeout);
+      activityEvents.forEach(event => {
+        document.removeEventListener(event, handleActivity, true);
+      });
+    };
+  }, [admin]);
+
+  /**
+   * Signs in an admin user with optional persistent login
+   */
+  const signIn = useCallback(async (email: string, password: string, rememberMe: boolean = false): Promise<SignInResult> => {
+    // Input validation
+    if (!email || !password) {
+      return {
+        success: false,
+        error: {
+          code: 'INVALID_INPUT',
+          message: 'Email and password are required'
+        }
+      };
+    }
+
+    if (!isValidEmail(email)) {
+      return {
+        success: false,
+        error: {
+          code: 'INVALID_EMAIL',
+          message: 'Please enter a valid email address'
+        }
+      };
+    }
+
+    if (password.length < 6) {
+      return {
+        success: false,
+        error: {
+          code: 'WEAK_PASSWORD',
+          message: 'Password must be at least 6 characters long'
+        }
+      };
+    }
+
+    setSigningIn(true);
+
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
-        email,
+        email: email.toLowerCase().trim(),
         password,
       });
 
-      if (error) throw error;
+      if (error) {
+        let errorMessage = 'Sign in failed';
+        let errorCode = 'SIGNIN_ERROR';
+
+        switch (error.message) {
+          case 'Invalid login credentials':
+            errorMessage = 'Invalid email or password';
+            errorCode = 'INVALID_CREDENTIALS';
+            break;
+          case 'Email not confirmed':
+            errorMessage = 'Please confirm your email address';
+            errorCode = 'EMAIL_NOT_CONFIRMED';
+            break;
+          case 'Too many requests':
+            errorMessage = 'Too many attempts. Please try again later';
+            errorCode = 'RATE_LIMITED';
+            break;
+          default:
+            errorMessage = error.message;
+        }
+
+        return {
+          success: false,
+          error: {
+            code: errorCode,
+            message: errorMessage
+          }
+        };
+      }
 
       if (data.user) {
-        // Check if user is an admin
-        const { data: adminData, error: adminError } = await supabase
-          .from('admin_users')
-          .select('*')
-          .eq('id', data.user.id)
-          .eq('is_active', true)
-          .single();
-
-        if (adminError || !adminData) {
+        const adminData = await fetchAdminData(data.user.id);
+        
+        if (!adminData) {
           await supabase.auth.signOut();
-          return { error: 'Access denied. Admin account required.' };
+          return {
+            success: false,
+            error: {
+              code: 'ACCESS_DENIED',
+              message: 'Access denied. Admin account required.'
+            }
+          };
         }
 
         setAdmin(adminData);
+        saveAdminSession(adminData, rememberMe);
+        
         toast({
-          title: "Success",
-          description: "Signed in successfully",
+          title: "Welcome back!",
+          description: `Signed in as ${adminData.email}${rememberMe ? ' (Stay signed in enabled)' : ''}`,
         });
-        return {};
-      }
-    } catch (error: any) {
-      return { error: error.message };
-    }
-    return { error: 'Unknown error occurred' };
-  };
 
-  const signOut = async () => {
-    await supabase.auth.signOut();
-    setAdmin(null);
-    toast({
-      title: "Signed out",
-      description: "You have been signed out successfully",
-    });
+        return { success: true };
+      }
+
+      return {
+        success: false,
+        error: {
+          code: 'UNKNOWN_ERROR',
+          message: 'An unexpected error occurred'
+        }
+      };
+
+    } catch (error: any) {
+      console.error('Sign in exception:', error);
+      return {
+        success: false,
+        error: {
+          code: 'NETWORK_ERROR',
+          message: 'Network error. Please check your connection.'
+        }
+      };
+    } finally {
+      setSigningIn(false);
+    }
+  }, [fetchAdminData, toast, saveAdminSession]);
+
+  /**
+   * Signs out the current admin user
+   */
+  const signOut = useCallback(async (): Promise<void> => {
+    try {
+      await supabase.auth.signOut();
+      setAdmin(null);
+      clearPersistentSession();
+      
+      toast({
+        title: "Signed out",
+        description: "You have been signed out successfully",
+      });
+    } catch (error) {
+      console.error('Sign out error:', error);
+      // Still clear local state even if API call fails
+      setAdmin(null);
+      clearPersistentSession();
+    }
+  }, [toast, clearPersistentSession]);
+
+  const value: AdminAuthContextType = {
+    admin,
+    loading,
+    signingIn,
+    signIn,
+    signOut,
+    refreshAdmin,
+    isAutoLoginEnabled,
+    clearPersistentSession,
+    error: null // Placeholder for future error handling
   };
 
   return (
-    <AdminAuthContext.Provider value={{ admin, loading, signIn, signOut }}>
+    <AdminAuthContext.Provider value={value}>
       {children}
     </AdminAuthContext.Provider>
   );
 };
 
-export const useAdminAuth = () => {
+/**
+ * Hook to use admin authentication context
+ * @throws {Error} If used outside of AdminAuthProvider
+ */
+export const useAdminAuth = (): AdminAuthContextType => {
   const context = useContext(AdminAuthContext);
   if (context === undefined) {
     throw new Error('useAdminAuth must be used within an AdminAuthProvider');
   }
   return context;
+};
+
+/**
+ * Type guard to check if user is admin
+ */
+export const isAdminUser = (user: any): user is AdminUser => {
+  return (
+    user &&
+    typeof user.id === 'string' &&
+    typeof user.email === 'string' &&
+    typeof user.role === 'string' &&
+    typeof user.is_active === 'boolean' &&
+    user.is_active === true
+  );
+};
+
+/**
+ * Admin route guard hook
+ * Returns whether the current user can access admin routes
+ */
+export const useAdminRouteGuard = () => {
+  const { admin, loading } = useAdminAuth();
+  
+  return {
+    canAccess: !loading && isAdminUser(admin),
+    isLoading: loading,
+    admin
+  };
 };

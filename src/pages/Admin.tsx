@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { useRef } from "react";
 import { Plus, Edit, Trash2, Eye, EyeOff, Package, BarChart3, Users, ShoppingBag, LogOut, Image, Search, X, ExternalLink, Calendar, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,6 +14,8 @@ import { AdminLogin } from "@/components/admin/AdminLogin";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ErrorBoundary } from "react-error-boundary";
+import { ShopImageCarouselForm } from "@/components/admin/ShopImageCarouselForm";
+import { ShopImageCarouselList } from "@/components/admin/ShopImageCarouselList";
 
 // Error Boundary Fallback Component
 const ErrorFallback = ({ error, resetErrorBoundary }) => {
@@ -68,135 +71,293 @@ interface Banner {
   display_order: number;
 }
 
+interface ShopImageCarousel {
+  id: string;
+  title: string;
+  alt_text: string;
+  image_url: string;
+  display_order: number;
+  is_active: boolean;
+}
+
+// Custom hook for managing pagination
+const usePagination = (initialPage = 1) => {
+  const [page, setPage] = useState(initialPage);
+  
+  const nextPage = useCallback(() => setPage(prev => prev + 1), []);
+  const prevPage = useCallback(() => setPage(prev => Math.max(1, prev - 1)), []);
+  const resetPage = useCallback(() => setPage(1), []);
+  
+  return { page, nextPage, prevPage, resetPage, setPage };
+};
+
+// Custom hook for search functionality
+const useSearch = (items: Product[], searchFields: (keyof Product)[]) => {
+  const [searchQuery, setSearchQuery] = useState("");
+  
+  const filteredItems = useMemo(() => {
+    if (!searchQuery.trim()) return items;
+    
+    const query = searchQuery.toLowerCase();
+    return items.filter(item => 
+      searchFields.some(field => {
+        const value = item[field];
+        if (typeof value === 'string') {
+          return value.toLowerCase().includes(query);
+        }
+        if (field === 'categories' && item.categories) {
+          return item.categories.name.toLowerCase().includes(query);
+        }
+        return false;
+      })
+    );
+  }, [items, searchQuery, searchFields]);
+  
+  return { searchQuery, setSearchQuery, filteredItems };
+};
+
 const Admin = () => {
   const { admin, loading: authLoading, signOut } = useAdminAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [banners, setBanners] = useState<Banner[]>([]);
+  const [carouselItems, setCarouselItems] = useState<ShopImageCarousel[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // Form state management
   const [showProductForm, setShowProductForm] = useState(false);
   const [showCategoryForm, setShowCategoryForm] = useState(false);
   const [showBannerForm, setShowBannerForm] = useState(false);
+  const [showCarouselForm, setShowCarouselForm] = useState(false);
+  
+  // Editing state
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [editingBanner, setEditingBanner] = useState<Banner | null>(null);
-  const [productPage, setProductPage] = useState(1);
-  const [categoryPage, setCategoryPage] = useState(1);
-  const [bannerPage, setBannerPage] = useState(1);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
-  const [viewingProduct, setViewingProduct] = useState<Product | null>(null);
-  const [deletingProduct, setDeletingProduct] = useState<Product | null>(null);
+  const [editingCarouselItem, setEditingCarouselItem] = useState<ShopImageCarousel | null>(null);
+  
+  // Pagination hooks
+  const productPagination = usePagination();
+  const categoryPagination = usePagination();
+  const bannerPagination = usePagination();
+  const carouselPagination = usePagination();
+  
+  // Search functionality
+  const productSearch = useSearch(products, ['name', 'description', 'short_description', 'sku']);
+  
   const itemsPerPage = 10;
   const { toast } = useToast();
   const location = useLocation();
   const navigate = useNavigate();
+  const dataLoadedRef = useRef(false);
 
-  // Memoized data fetching functions
-  const fetchProducts = useCallback(async () => {
+  // Reset product page when searching
+  useEffect(() => {
+    productPagination.resetPage();
+  }, [productSearch.searchQuery]);
+
+  // Memoized stats calculations
+  const stats = useMemo(() => ({
+    totalProducts: products.length,
+    activeProducts: products.filter(p => p.is_active).length,
+    totalCategories: categories.length,
+    activeCategories: categories.filter(c => c.is_active).length,
+    totalBanners: banners.length,
+    activeBanners: banners.filter(b => b.is_active).length,
+    featuredProducts: products.filter(p => p.is_featured).length,
+    lowStockProducts: products.filter(p => p.stock_quantity < 10).length,
+  }), [products, categories, banners]);
+
+  // Optimized data fetching function
+  const fetchAllAdminData = useCallback(async () => {
+    console.log('fetchAllAdminData called');
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('products')
-        .select(`
-          *,
-          categories(name, slug)
-        `)
-        .order('created_at', { ascending: false })
-        .range((productPage - 1) * itemsPerPage, productPage * itemsPerPage - 1);
+      
+      const [productsResult, categoriesResult, bannersResult, carouselResult] = await Promise.all([
+        supabase
+          .from('products')
+          .select(`*, categories(name, slug)`)
+          .order('created_at', { ascending: false })
+          .range((productPagination.page - 1) * itemsPerPage, productPagination.page * itemsPerPage - 1),
+        
+        supabase
+          .from('categories')
+          .select('*')
+          .order('name')
+          .range((categoryPagination.page - 1) * itemsPerPage, categoryPagination.page * itemsPerPage - 1),
+        
+        supabase
+          .from('banners')
+          .select('*')
+          .order('display_order')
+          .range((bannerPagination.page - 1) * itemsPerPage, bannerPagination.page * itemsPerPage - 1),
+        
+        supabase
+          .from('carousel_images')
+          .select('*')
+          .order('display_order')
+          .range((carouselPagination.page - 1) * itemsPerPage, carouselPagination.page * itemsPerPage - 1)
+      ]);
 
-      if (error) throw error;
-      setProducts(data || []);
-      setFilteredProducts(data || []);
+      if (productsResult.error) throw productsResult.error;
+      if (categoriesResult.error) throw categoriesResult.error;
+      if (bannersResult.error) throw bannersResult.error;
+      if (carouselResult.error) throw carouselResult.error;
+
+      setProducts(productsResult.data || []);
+      setCategories(categoriesResult.data || []);
+      setBanners(bannersResult.data || []);
+      setCarouselItems(carouselResult.data || []);
+
     } catch (error) {
-      console.error('Error fetching products:', error);
+      console.error('Error fetching admin data:', error);
       toast({
         title: "Error",
-        description: "Failed to load products",
+        description: "Failed to load admin data",
         variant: "destructive",
       });
     } finally {
       setLoading(false);
     }
-  }, [productPage, toast]);
+  }, [
+    productPagination.page, 
+    categoryPagination.page, 
+    bannerPagination.page, 
+    carouselPagination.page,
+    toast
+  ]);
 
-  const fetchCategories = useCallback(async () => {
-    try {
-      const { data, error } = await supabase
-        .from('categories')
-        .select('*')
-        .order('name')
-        .range((categoryPage - 1) * itemsPerPage, categoryPage * itemsPerPage - 1);
+  // Generic toggle function for better code reuse
+  const createToggleFunction = useCallback((
+    table: string,
+    field: string,
+    setState: React.Dispatch<React.SetStateAction<any[]>>,
+    successMessage: string
+  ) => {
+    return async (id: string, currentStatus: boolean) => {
+      try {
+        const { error } = await supabase
+          .from(table)
+          .update({ [field]: !currentStatus })
+          .eq('id', id);
 
-      if (error) throw error;
-      setCategories(data || []);
-    } catch (error) {
-      console.error('Error fetching categories:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load categories",
-        variant: "destructive",
-      });
+        if (error) throw error;
+
+        setState(prev => prev.map(item => 
+          item.id === id ? { ...item, [field]: !currentStatus } : item
+        ));
+
+        toast({
+          title: "Success",
+          description: `${successMessage} ${!currentStatus ? 'activated' : 'deactivated'} successfully`,
+        });
+      } catch (error) {
+        console.error(`Error updating ${table} ${field}:`, error);
+        toast({
+          title: "Error",
+          description: `Failed to update ${table} ${field}`,
+          variant: "destructive",
+        });
+      }
+    };
+  }, [toast]);
+
+  // Generic delete function
+  const createDeleteFunction = useCallback((
+    table: string,
+    setState: React.Dispatch<React.SetStateAction<any[]>>,
+    confirmMessage: string
+  ) => {
+    return async (id: string) => {
+      if (!confirm(confirmMessage)) return;
+
+      try {
+        const { error } = await supabase
+          .from(table)
+          .delete()
+          .eq('id', id);
+
+        if (error) throw error;
+
+        setState(prev => prev.filter(item => item.id !== id));
+        toast({
+          title: "Success",
+          description: `${table.slice(0, -1)} deleted successfully`,
+        });
+      } catch (error) {
+        console.error(`Error deleting ${table}:`, error);
+        toast({
+          title: "Error",
+          description: `Failed to delete ${table.slice(0, -1)}`,
+          variant: "destructive",
+        });
+      }
+    };
+  }, [toast]);
+
+  // Specific toggle and delete functions using the generic ones
+  const toggleProductStatus = createToggleFunction('products', 'is_active', setProducts, 'Product');
+  const toggleProductFeatured = createToggleFunction('products', 'is_featured', setProducts, 'Product');
+  const toggleCategoryVisibility = createToggleFunction('categories', 'is_active', setCategories, 'Category');
+  const toggleBannerStatus = createToggleFunction('banners', 'is_active', setBanners, 'Banner');
+  const toggleCarouselActive = createToggleFunction('carousel_images', 'is_active', setCarouselItems, 'Carousel image');
+
+  const deleteProduct = createDeleteFunction('products', setProducts, 'Are you sure you want to delete this product?');
+  const deleteCategory = createDeleteFunction('categories', setCategories, 'Are you sure you want to delete this category?');
+  const deleteBanner = createDeleteFunction('banners', setBanners, 'Are you sure you want to delete this banner?');
+  const deleteCarouselItem = createDeleteFunction('carousel_images', setCarouselItems, 'Are you sure you want to delete this carousel image?');
+
+  // Price formatting utility
+  const formatPrice = useCallback((price: number) => {
+    return new Intl.NumberFormat('en-UG', {
+      style: 'currency',
+      currency: 'UGX',
+      minimumFractionDigits: 0
+    }).format(price);
+  }, []);
+
+  // Form handlers
+  const handleCloseForm = useCallback((formType: 'product' | 'category' | 'banner' | 'carousel') => {
+    switch (formType) {
+      case 'product':
+        setShowProductForm(false);
+        setEditingProduct(null);
+        break;
+      case 'category':
+        setShowCategoryForm(false);
+        setEditingCategory(null);
+        break;
+      case 'banner':
+        setShowBannerForm(false);
+        setEditingBanner(null);
+        break;
+      case 'carousel':
+        setShowCarouselForm(false);
+        setEditingCarouselItem(null);
+        break;
     }
-  }, [categoryPage, toast]);
+  }, []);
 
-  const fetchBanners = useCallback(async () => {
-    try {
-      const { data, error } = await supabase
-        .from('banners')
-        .select('*')
-        .order('display_order')
-        .range((bannerPage - 1) * itemsPerPage, bannerPage * itemsPerPage - 1);
+  const handleSaveForm = useCallback((formType: 'product' | 'category' | 'banner' | 'carousel') => {
+    fetchAllAdminData();
+    handleCloseForm(formType);
+  }, [fetchAllAdminData, handleCloseForm]);
 
-      if (error) throw error;
-      setBanners(data || []);
-    } catch (error) {
-      console.error('Error fetching banners:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load banners",
-        variant: "destructive",
-      });
-    }
-  }, [bannerPage, toast]);
-
-  // Filter products based on search query
+  // Load data effect
   useEffect(() => {
-    if (!searchQuery.trim()) {
-      setFilteredProducts(products);
-    } else {
-      const filtered = products.filter(product => 
-        product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.short_description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.categories?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.sku?.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-      setFilteredProducts(filtered);
-    }
-  }, [products, searchQuery]);
-
-  // Reset page when searching
-  useEffect(() => {
-    setProductPage(1);
-  }, [searchQuery]);
-
-  // Load data sequentially to avoid concurrent requests
-  useEffect(() => {
-    if (!admin) return;
+    console.log('Admin useEffect triggered:', { admin, authLoading });
+    if (!admin || dataLoadedRef.current) return;
 
     const loadData = async () => {
-      setLoading(true);
-      await fetchProducts();
-      await fetchCategories();
-      await fetchBanners();
-      setLoading(false);
+      dataLoadedRef.current = true;
+      await fetchAllAdminData();
     };
 
     loadData();
-  }, [admin, fetchProducts, fetchCategories, fetchBanners]);
+  }, [admin, fetchAllAdminData]);
 
-  // Enhanced session management
+  // Session management effects (keeping the original logic)
   useEffect(() => {
     if (!admin || authLoading) return;
 
@@ -220,13 +381,13 @@ const Admin = () => {
     if (!isAdminRoute) {
       handleLogout();
     }
-  }, [location.pathname, admin, authLoading, signOut, navigate, toast]);
+  }, [location.pathname, admin, authLoading, signOut, toast, navigate]);
 
   // Security event listeners
   useEffect(() => {
     if (!admin) return;
 
-    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+    const handleBeforeUnload = () => {
       localStorage.removeItem('sb-rvteqxtonbgjuhztnzpx-auth-token');
       sessionStorage.clear();
       localStorage.removeItem('admin-session');
@@ -281,207 +442,7 @@ const Admin = () => {
     }
   };
 
-  const toggleProductStatus = async (productId: string, currentStatus: boolean) => {
-    try {
-      const { error } = await supabase
-        .from('products')
-        .update({ is_active: !currentStatus })
-        .eq('id', productId);
-
-      if (error) throw error;
-
-      setProducts(prev => prev.map(product => 
-        product.id === productId 
-          ? { ...product, is_active: !currentStatus }
-          : product
-      ));
-
-      toast({
-        title: "Success",
-        description: `Product ${!currentStatus ? 'activated' : 'deactivated'} successfully`,
-      });
-    } catch (error) {
-      console.error('Error updating product status:', error);
-      toast({
-        title: "Error",
-        description: "Failed to update product status",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const toggleProductFeatured = async (productId: string, currentStatus: boolean) => {
-    try {
-      const { error } = await supabase
-        .from('products')
-        .update({ is_featured: !currentStatus })
-        .eq('id', productId);
-
-      if (error) throw error;
-
-      setProducts(prev => prev.map(product => 
-        product.id === productId 
-          ? { ...product, is_featured: !currentStatus }
-          : product
-      ));
-
-      toast({
-        title: "Success",
-        description: `Product ${!currentStatus ? 'featured' : 'unfeatured'} successfully`,
-      });
-    } catch (error) {
-      console.error('Error updating product featured status:', error);
-      toast({
-        title: "Error",
-        description: "Failed to update product featured status",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const deleteProduct = async (productId: string) => {
-    try {
-      const { error } = await supabase
-        .from('products')
-        .delete()
-        .eq('id', productId);
-
-      if (error) throw error;
-
-      setProducts(prev => prev.filter(product => product.id !== productId));
-      setDeletingProduct(null);
-      toast({
-        title: "Success",
-        description: "Product deleted successfully",
-      });
-    } catch (error) {
-      console.error('Error deleting product:', error);
-      toast({
-        title: "Error",
-        description: "Failed to delete product",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('en-UG', {
-      style: 'currency',
-      currency: 'UGX',
-      minimumFractionDigits: 0
-    }).format(price);
-  };
-
-  const toggleBannerStatus = async (bannerId: string, currentStatus: boolean) => {
-    try {
-      const { error } = await supabase
-        .from('banners')
-        .update({ is_active: !currentStatus })
-        .eq('id', bannerId);
-
-      if (error) throw error;
-
-      setBanners(prev => prev.map(banner => 
-        banner.id === bannerId 
-          ? { ...banner, is_active: !currentStatus }
-          : banner
-      ));
-
-      toast({
-        title: "Success",
-        description: `Banner ${!currentStatus ? 'activated' : 'deactivated'} successfully`,
-      });
-    } catch (error) {
-      console.error('Error updating banner status:', error);
-      toast({
-        title: "Error",
-        description: "Failed to update banner status",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const deleteBanner = async (bannerId: string) => {
-    if (!confirm('Are you sure you want to delete this banner?')) return;
-
-    try {
-      const { error } = await supabase
-        .from('banners')
-        .delete()
-        .eq('id', bannerId);
-
-      if (error) throw error;
-
-      setBanners(prev => prev.filter(banner => banner.id !== bannerId));
-      toast({
-        title: "Success",
-        description: "Banner deleted successfully",
-      });
-    } catch (error) {
-      console.error('Error deleting banner:', error);
-      toast({
-        title: "Error",
-        description: "Failed to delete banner",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const toggleCategoryVisibility = async (categoryId: string, currentStatus: boolean) => {
-    try {
-      const { error } = await supabase
-        .from('categories')
-        .update({ is_active: !currentStatus })
-        .eq('id', categoryId);
-
-      if (error) throw error;
-
-      setCategories(prev => prev.map(category => 
-        category.id === categoryId 
-          ? { ...category, is_active: !currentStatus }
-          : category
-      ));
-
-      toast({
-        title: "Success",
-        description: `Category ${!currentStatus ? 'activated' : 'deactivated'} successfully`,
-      });
-    } catch (error) {
-      console.error('Error updating category visibility:', error);
-      toast({
-        title: "Error",
-        description: "Failed to update category visibility",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const deleteCategory = async (categoryId: string) => {
-    if (!confirm('Are you sure you want to delete this category?')) return;
-
-    try {
-      const { error } = await supabase
-        .from('categories')
-        .delete()
-        .eq('id', categoryId);
-
-      if (error) throw error;
-
-      setCategories(prev => prev.filter(category => category.id !== categoryId));
-      toast({
-        title: "Success",
-        description: "Category deleted successfully",
-      });
-    } catch (error) {
-      console.error('Error deleting category:', error);
-      toast({
-        title: "Error",
-        description: "Failed to delete category",
-        variant: "destructive",
-      });
-    }
-  };
-
+  // Loading state
   if (authLoading) {
     return (
       <div className="container mx-auto px-3 py-4">
@@ -515,7 +476,7 @@ const Admin = () => {
           </Button>
         </div>
 
-        {/* Stats Cards - More compact on mobile */}
+        {/* Stats Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-6 mb-4 sm:mb-8">
           <Card className="p-0">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 px-2 pt-2 sm:px-6 sm:pt-6 sm:pb-2">
@@ -523,10 +484,8 @@ const Admin = () => {
               <Package className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent className="px-2 pb-2 sm:px-6 sm:pb-6">
-              <div className="text-lg sm:text-2xl font-bold">{products.length}</div>
-              <p className="text-xs text-muted-foreground">
-                {products.filter(p => p.is_active).length} active
-              </p>
+              <div className="text-lg sm:text-2xl font-bold">{stats.totalProducts}</div>
+              <p className="text-xs text-muted-foreground">{stats.activeProducts} active</p>
             </CardContent>
           </Card>
 
@@ -536,10 +495,8 @@ const Admin = () => {
               <BarChart3 className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent className="px-2 pb-2 sm:px-6 sm:pb-6">
-              <div className="text-lg sm:text-2xl font-bold">{categories.length}</div>
-              <p className="text-xs text-muted-foreground">
-                {categories.filter(c => c.is_active).length} active
-              </p>
+              <div className="text-lg sm:text-2xl font-bold">{stats.totalCategories}</div>
+              <p className="text-xs text-muted-foreground">{stats.activeCategories} active</p>
             </CardContent>
           </Card>
 
@@ -549,10 +506,8 @@ const Admin = () => {
               <Image className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent className="px-2 pb-2 sm:px-6 sm:pb-6">
-              <div className="text-lg sm:text-2xl font-bold">{banners.length}</div>
-              <p className="text-xs text-muted-foreground">
-                {banners.filter(b => b.is_active).length} active
-              </p>
+              <div className="text-lg sm:text-2xl font-bold">{stats.totalBanners}</div>
+              <p className="text-xs text-muted-foreground">{stats.activeBanners} active</p>
             </CardContent>
           </Card>
 
@@ -562,12 +517,8 @@ const Admin = () => {
               <ShoppingBag className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent className="px-2 pb-2 sm:px-6 sm:pb-6">
-              <div className="text-lg sm:text-2xl font-bold">
-                {products.filter(p => p.is_featured).length}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                On homepage
-              </p>
+              <div className="text-lg sm:text-2xl font-bold">{stats.featuredProducts}</div>
+              <p className="text-xs text-muted-foreground">On homepage</p>
             </CardContent>
           </Card>
 
@@ -577,21 +528,18 @@ const Admin = () => {
               <Users className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent className="px-2 pb-2 sm:px-6 sm:pb-6">
-              <div className="text-lg sm:text-2xl font-bold">
-                {products.filter(p => p.stock_quantity < 10).length}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Below 10 units
-              </p>
+              <div className="text-lg sm:text-2xl font-bold">{stats.lowStockProducts}</div>
+              <p className="text-xs text-muted-foreground">Below 10 units</p>
             </CardContent>
           </Card>
         </div>
 
         <Tabs defaultValue="products" className="space-y-3 sm:space-y-4">
-          <TabsList className="grid w-full grid-cols-3 h-8 sm:h-10">
+          <TabsList className="grid w-full grid-cols-4 h-8 sm:h-10">
             <TabsTrigger value="products" className="text-xs sm:text-sm">Products</TabsTrigger>
             <TabsTrigger value="categories" className="text-xs sm:text-sm">Categories</TabsTrigger>
             <TabsTrigger value="banners" className="text-xs sm:text-sm">Banners</TabsTrigger>
+            <TabsTrigger value="carousel" className="text-xs sm:text-sm">Shop Carousel</TabsTrigger>
           </TabsList>
 
           <TabsContent value="products" className="space-y-3 sm:space-y-4">
@@ -606,18 +554,18 @@ const Admin = () => {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setProductPage(prev => Math.max(1, prev - 1))}
-                    disabled={productPage === 1}
+                    onClick={productPagination.prevPage}
+                    disabled={productPagination.page === 1}
                     className="text-xs h-7"
                   >
                     Prev
                   </Button>
-                  <span className="text-xs">Page {productPage}</span>
+                  <span className="text-xs">Page {productPagination.page}</span>
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setProductPage(prev => prev + 1)}
-                    disabled={filteredProducts.length < itemsPerPage}
+                    onClick={productPagination.nextPage}
+                    disabled={productSearch.filteredItems.length < itemsPerPage}
                     className="text-xs h-7"
                   >
                     Next
@@ -633,33 +581,33 @@ const Admin = () => {
                 <input
                   type="text"
                   placeholder="Search products by name, description, category, or SKU..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  value={productSearch.searchQuery}
+                  onChange={(e) => productSearch.setSearchQuery(e.target.value)}
                   className="w-full pl-10 pr-10 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
-                {searchQuery && (
+                {productSearch.searchQuery && (
                   <button
-                    onClick={() => setSearchQuery("")}
+                    onClick={() => productSearch.setSearchQuery("")}
                     className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
                   >
                     <X className="w-4 h-4" />
                   </button>
                 )}
               </div>
-              {searchQuery && (
+              {productSearch.searchQuery && (
                 <div className="mt-2 text-xs text-gray-500">
-                  Found {filteredProducts.length} product{filteredProducts.length !== 1 ? 's' : ''} 
-                  {searchQuery && ` matching "${searchQuery}"`}
+                  Found {productSearch.filteredItems.length} product{productSearch.filteredItems.length !== 1 ? 's' : ''} 
+                  {productSearch.searchQuery && ` matching "${productSearch.searchQuery}"`}
                 </div>
               )}
             </div>
 
             <div className="space-y-2 sm:space-y-4">
-              {filteredProducts.length === 0 ? (
+              {productSearch.filteredItems.length === 0 ? (
                 <Card className="p-0">
                   <CardContent className="p-6 text-center">
                     <div className="text-gray-500">
-                      {searchQuery ? (
+                      {productSearch.searchQuery ? (
                         <>
                           <Search className="w-12 h-12 mx-auto mb-4 text-gray-300" />
                           <p className="text-lg font-medium mb-2">No products found</p>
@@ -676,7 +624,7 @@ const Admin = () => {
                   </CardContent>
                 </Card>
               ) : (
-                filteredProducts.map((product) => (
+                productSearch.filteredItems.map((product) => (
                 <Card key={product.id} className="p-0">
                   <CardContent className="p-3 sm:p-6">
                     <div className="flex gap-3">
@@ -788,17 +736,17 @@ const Admin = () => {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setCategoryPage(prev => Math.max(1, prev - 1))}
-                    disabled={categoryPage === 1}
+                    onClick={categoryPagination.prevPage}
+                    disabled={categoryPagination.page === 1}
                     className="text-xs h-7"
                   >
                     Prev
                   </Button>
-                  <span className="text-xs">Page {categoryPage}</span>
+                  <span className="text-xs">Page {categoryPagination.page}</span>
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setCategoryPage(prev => prev + 1)}
+                    onClick={categoryPagination.nextPage}
                     disabled={categories.length < itemsPerPage}
                     className="text-xs h-7"
                   >
@@ -879,17 +827,17 @@ const Admin = () => {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setBannerPage(prev => Math.max(1, prev - 1))}
-                    disabled={bannerPage === 1}
+                    onClick={bannerPagination.prevPage}
+                    disabled={bannerPagination.page === 1}
                     className="text-xs h-7"
                   >
                     Prev
                   </Button>
-                  <span className="text-xs">Page {bannerPage}</span>
+                  <span className="text-xs">Page {bannerPagination.page}</span>
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setBannerPage(prev => prev + 1)}
+                    onClick={bannerPagination.nextPage}
                     disabled={banners.length < itemsPerPage}
                     className="text-xs h-7"
                   >
@@ -977,51 +925,81 @@ const Admin = () => {
               ))}
             </div>
           </TabsContent>
+
+          <TabsContent value="carousel" className="space-y-3 sm:space-y-4">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+              <h2 className="text-lg sm:text-2xl font-bold">Shop Image Carousel</h2>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                <Button onClick={() => setShowCarouselForm(true)} className="w-full sm:w-auto text-xs sm:text-sm h-8 sm:h-10">
+                  <Plus className="w-3 h-3 sm:w-4 sm:h-4 mr-2" />
+                  Add Carousel Image
+                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={carouselPagination.prevPage}
+                    disabled={carouselPagination.page === 1}
+                    className="text-xs h-7"
+                  >
+                    Prev
+                  </Button>
+                  <span className="text-xs">Page {carouselPagination.page}</span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={carouselPagination.nextPage}
+                    disabled={carouselItems.length < itemsPerPage}
+                    className="text-xs h-7"
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            </div>
+            <ShopImageCarouselList
+              items={carouselItems}
+              onEdit={(item) => {
+                setEditingCarouselItem(item);
+                setShowCarouselForm(true);
+              }}
+              onDelete={deleteCarouselItem}
+              onToggleActive={toggleCarouselActive}
+            />
+          </TabsContent>
         </Tabs>
 
+        {/* Form Modals */}
         {showProductForm && (
           <ProductForm
             product={editingProduct}
             categories={categories}
-            onClose={() => {
-              setShowProductForm(false);
-              setEditingProduct(null);
-            }}
-            onSave={() => {
-              fetchProducts();
-              setShowProductForm(false);
-              setEditingProduct(null);
-            }}
+            onClose={() => handleCloseForm('product')}
+            onSave={() => handleSaveForm('product')}
           />
         )}
 
         {showCategoryForm && (
           <CategoryForm
             category={editingCategory}
-            onClose={() => {
-              setShowCategoryForm(false);
-              setEditingCategory(null);
-            }}
-            onSave={() => {
-              fetchCategories();
-              setShowCategoryForm(false);
-              setEditingCategory(null);
-            }}
+            onClose={() => handleCloseForm('category')}
+            onSave={() => handleSaveForm('category')}
           />
         )}
 
         {showBannerForm && (
           <BannerForm
             banner={editingBanner}
-            onClose={() => {
-              setShowBannerForm(false);
-              setEditingBanner(null);
-            }}
-            onSave={() => {
-              fetchBanners();
-              setShowBannerForm(false);
-              setEditingBanner(null);
-            }}
+            onClose={() => handleCloseForm('banner')}
+            onSave={() => handleSaveForm('banner')}
+          />
+        )}
+
+        {showCarouselForm && (
+          <ShopImageCarouselForm
+            carouselItem={editingCarouselItem}
+            onClose={() => handleCloseForm('carousel')}
+            onSave={() => handleSaveForm('carousel')}
           />
         )}
       </div>

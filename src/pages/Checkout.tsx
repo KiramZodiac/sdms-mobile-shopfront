@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -40,7 +39,7 @@ const Checkout = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (items.length === 0) {
       toast({
         title: "Cart Empty",
@@ -85,9 +84,8 @@ const Checkout = () => {
 
       if (orderNumberError) throw orderNumberError;
 
-      // Create order
-      const shippingFee = 10000; // 10,000 UGX shipping fee
-      const orderTotal = total + shippingFee;
+      // Create order (without shipping fee)
+      const orderTotal = total; // Excludes shipping
 
       const { data: order, error: orderError } = await supabase
         .from('orders')
@@ -95,7 +93,7 @@ const Checkout = () => {
           customer_id: customer.id,
           order_number: orderNumber,
           subtotal: total,
-          shipping_fee: shippingFee,
+          shipping_fee: null,
           total: orderTotal,
           payment_method: 'whatsapp',
           status: 'pending',
@@ -121,45 +119,48 @@ const Checkout = () => {
 
       if (itemsError) throw itemsError;
 
-      // Generate WhatsApp message
-      const itemsList = items.map(item => 
+      // WhatsApp message
+      const itemsList = items.map(item =>
         `${item.name} - Qty: ${item.quantity} - ${formatPrice(item.price * item.quantity)}`
       ).join('\n');
+
+      const customerDetails = [
+        `Name: ${customerData.firstName} ${customerData.lastName}`,
+        `Phone: ${customerData.phone}`,
+        customerData.email && `Email: ${customerData.email}`,
+        customerData.address && `Address: ${customerData.address}`,
+        customerData.city && `City: ${customerData.city}`,
+        customerData.district && `District: ${customerData.district}`
+      ].filter(Boolean).join('\n');
 
       const message = `New Order: ${orderNumber}
 
 Customer Details:
-Name: ${customerData.firstName} ${customerData.lastName}
-Phone: ${customerData.phone}
-${customerData.email ? `Email: ${customerData.email}` : ''}
-${customerData.address ? `Address: ${customerData.address}` : ''}
-${customerData.city ? `City: ${customerData.city}` : ''}
-${customerData.district ? `District: ${customerData.district}` : ''}
+${customerDetails}
 
 Order Details:
 ${itemsList}
 
 Subtotal: ${formatPrice(total)}
-Shipping: ${formatPrice(shippingFee)}
-Total: ${formatPrice(orderTotal)}
+Shipping: To be confirmed by seller
+Total (excluding shipping): ${formatPrice(orderTotal)}
 
 ${customerData.notes ? `Notes: ${customerData.notes}` : ''}`;
 
-      const whatsappUrl = `https://wa.me/256751214095?text=${encodeURIComponent(message)}`;
+      const whatsappUrl = `https://wa.me/+256755869853?text=${encodeURIComponent(message)}`;
 
-      // Update order with WhatsApp URL
+      // Save WhatsApp URL
       await supabase
         .from('orders')
         .update({ whatsapp_chat_url: whatsappUrl })
         .eq('id', order.id);
 
-      // Clear cart and redirect to WhatsApp
       clearCart();
       window.open(whatsappUrl, '_blank');
 
       toast({
-        title: "Order Placed!",
-        description: "Your order has been submitted. You'll be redirected to WhatsApp to complete the payment.",
+        title: "Order Sent",
+        description: "You'll be redirected to WhatsApp. The seller will confirm your shipping fee there.",
       });
 
     } catch (error) {
@@ -177,7 +178,7 @@ ${customerData.notes ? `Notes: ${customerData.notes}` : ''}`;
   return (
     <div className="container mx-auto px-4 py-8">
       <h1 className="text-3xl font-bold text-gray-900 mb-8">Checkout</h1>
-      
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Cart Items */}
         <div>
@@ -275,22 +276,23 @@ ${customerData.notes ? `Notes: ${customerData.notes}` : ''}`;
                 </div>
 
                 <div className="pt-4 border-t">
+                <div className="text-sm text-gray-600 italic mb-2">
+  * Shipping fee will be confirmed by the seller after reviewing your location. <span className="text-green-600 font-medium">Some products may qualify for free delivery.</span>
+</div>
+
                   <div className="flex justify-between items-center mb-2">
                     <span>Subtotal:</span>
                     <span>{formatPrice(total)}</span>
                   </div>
-                  <div className="flex justify-between items-center mb-2">
-                    <span>Shipping:</span>
-                    <span>{formatPrice(10000)}</span>
-                  </div>
+
                   <div className="flex justify-between items-center text-lg font-semibold border-t pt-2">
-                    <span>Total:</span>
-                    <span>{formatPrice(total + 10000)}</span>
+                    <span>Total (excluding shipping):</span>
+                    <span>{formatPrice(total)}</span>
                   </div>
                 </div>
 
-                <Button 
-                  type="submit" 
+                <Button
+                  type="submit"
                   className="w-full bg-orange-500 hover:bg-orange-600 text-white"
                   disabled={loading || items.length === 0}
                 >

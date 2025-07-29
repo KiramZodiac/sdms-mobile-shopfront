@@ -1,38 +1,75 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 const ShopImageCarousel = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isAutoPlay, setIsAutoPlay] = useState(true);
   const [touchStartX, setTouchStartX] = useState(null);
+  // Use Supabase to fetch carousel images, fallback to static images if none
+  const [carouselImages, setCarouselImages] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const images = [
-    {
-      id: 1,
-      src: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=800&h=400&fit=crop&crop=center',
-      alt: 'Modern retail store interior',
-    },
-    {
-      id: 2,
-      src: 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=800&h=400&fit=crop&crop=center',
-      alt: 'Boutique clothing display',
-    },
-    {
-      id: 3,
-      src: 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=800&h=400&fit=crop&crop=center',
-      alt: 'Electronics store showcase',
-    },
-    {
-      id: 4,
-      src: 'https://images.unsplash.com/photo-1555529669-e69e7aa0ba9a?w=800&h=400&fit=crop&crop=center',
-      alt: 'Bookstore interior',
-    },
-    {
-      id: 5,
-      src: 'https://images.unsplash.com/photo-1528698827591-e19ccd7bc23d?w=800&h=400&fit=crop&crop=center',
-      alt: 'Coffee shop atmosphere',
-    },
-  ];
+  useEffect(() => {
+    let isMounted = true;
+    async function fetchCarouselImages() {
+      setLoading(true);
+      try {
+        // Lazy import to avoid import at top
+        const { supabase } = await import('@/integrations/supabase/client');
+        const { data, error } = await supabase
+          .from('carousel_images')
+          .select('id, image_url, alt_text')
+          .eq('is_active', true)
+          .order('display_order', { ascending: true });
+        if (!error && Array.isArray(data) && isMounted) {
+          setCarouselImages(data.filter(img => !!img.image_url));
+        }
+      } catch (err) {
+        // Optionally handle error
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    }
+    fetchCarouselImages();
+    return () => { isMounted = false; };
+  }, []);
+
+  // Use uploaded images if available, otherwise fallback to static images
+  const images = useMemo(() => {
+    return (carouselImages && carouselImages.length > 0)
+      ? carouselImages.map(img => ({
+          id: img.id,
+          src: img.image_url,
+          alt: img.alt_text || 'Shop carousel image',
+        }))
+      : [
+          {
+            id: 1,
+            src: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=800&h=400&fit=crop&crop=center',
+            alt: 'Modern retail store interior',
+          },
+          {
+            id: 2,
+            src: 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=800&h=400&fit=crop&crop=center',
+            alt: 'Boutique clothing display',
+          },
+          {
+            id: 3,
+            src: 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=800&h=400&fit=crop&crop=center',
+            alt: 'Electronics store showcase',
+          },
+          {
+            id: 4,
+            src: 'https://images.unsplash.com/photo-1555529669-e69e7aa0ba9a?w=800&h=400&fit=crop&crop=center',
+            alt: 'Bookstore interior',
+          },
+          {
+            id: 5,
+            src: 'https://images.unsplash.com/photo-1528698827591-e19ccd7bc23d?w=800&h=400&fit=crop&crop=center',
+            alt: 'Coffee shop atmosphere',
+          },
+        ];
+  }, [carouselImages]);
 
   // Autoplay
   useEffect(() => {
