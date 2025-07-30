@@ -17,7 +17,7 @@ interface FileUploadProps {
   onRemove?: () => void;
 }
 
-// Helper function to compress images for Samsung phones
+// Optimized image compression for better performance
 const compressImage = (file: File, maxSizeMB: number = 5): Promise<File> => {
   return new Promise((resolve) => {
     const canvas = document.createElement('canvas');
@@ -25,55 +25,63 @@ const compressImage = (file: File, maxSizeMB: number = 5): Promise<File> => {
     const img = new window.Image();
     
     img.onload = () => {
+      // Calculate optimal dimensions and quality based on file size
+      const fileSizeMB = file.size / 1024 / 1024;
+      let maxWidth = 1920;
+      let maxHeight = 1080;
+      let quality = 0.8;
+      
+      // Adjust compression settings based on original file size for faster processing
+      if (fileSizeMB > 10) {
+        maxWidth = 1280;
+        maxHeight = 720;
+        quality = 0.6;
+      } else if (fileSizeMB > 5) {
+        maxWidth = 1600;
+        maxHeight = 900;
+        quality = 0.7;
+      }
+      
       // Calculate new dimensions maintaining aspect ratio
-      const maxWidth = 1920;
-      const maxHeight = 1080;
       let { width, height } = img;
       
-      if (width > height) {
-        if (width > maxWidth) {
-          height = (height * maxWidth) / width;
-          width = maxWidth;
-        }
-      } else {
-        if (height > maxHeight) {
-          width = (width * maxHeight) / height;
-          height = maxHeight;
+      if (width > maxWidth || height > maxHeight) {
+        const aspectRatio = width / height;
+        if (aspectRatio > 1) {
+          width = Math.min(width, maxWidth);
+          height = width / aspectRatio;
+        } else {
+          height = Math.min(height, maxHeight);
+          width = height * aspectRatio;
         }
       }
       
       canvas.width = width;
       canvas.height = height;
       
-      ctx?.drawImage(img, 0, 0, width, height);
+      // Use better image scaling
+      if (ctx) {
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, 0, 0, width, height);
+      }
       
-      // Start with high quality, reduce if file is still too large
-      let quality = 0.8;
-      const compress = () => {
-        canvas.toBlob(
-          (blob) => {
-            if (blob) {
-              const compressedFile = new File([blob], file.name, {
-                type: 'image/jpeg',
-                lastModified: Date.now(),
-              });
-              
-              if (compressedFile.size / 1024 / 1024 > maxSizeMB && quality > 0.3) {
-                quality -= 0.1;
-                compress();
-              } else {
-                resolve(compressedFile);
-              }
-            } else {
-              resolve(file); // Fallback to original file
-            }
-          },
-          'image/jpeg',
-          quality
-        );
-      };
-      
-      compress();
+      // Single compression attempt with optimized quality
+      canvas.toBlob(
+        (blob) => {
+          if (blob) {
+            const compressedFile = new File([blob], file.name, {
+              type: 'image/jpeg',
+              lastModified: Date.now(),
+            });
+            resolve(compressedFile);
+          } else {
+            resolve(file); // Fallback to original file
+          }
+        },
+        'image/jpeg',
+        quality
+      );
     };
     
     img.onerror = () => resolve(file); // Fallback to original file
@@ -200,11 +208,11 @@ export const FileUpload = ({
           // Convert HEIC to JPEG if needed (Samsung phones)
           processedFile = await convertHeicToJpeg(file);
           
-          // Compress if file is too large (Samsung cameras produce large files)
-          if (processedFile.size / 1024 / 1024 > 5) {
+          // Compress if file is too large (optimized threshold for better performance)
+          if (processedFile.size / 1024 / 1024 > 3) {
             toast({
-              title: "Processing",
-              description: "Compressing large image...",
+              title: "Optimizing",
+              description: "Optimizing image for faster upload...",
             });
             processedFile = await compressImage(processedFile);
           }
@@ -219,10 +227,10 @@ export const FileUpload = ({
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
       const filePath = fileName;
 
-      // Upload with retry mechanism for better reliability
+      // Optimized upload with smart retry mechanism
       let uploadError: any = null;
       let retryCount = 0;
-      const maxRetries = 2;
+      const maxRetries = 1; // Reduced retries for faster response
 
       while (retryCount <= maxRetries) {
         const { error } = await supabase.storage
@@ -237,12 +245,17 @@ export const FileUpload = ({
         uploadError = error;
         retryCount++;
 
-        // Retry for any error (since storage is public)
-        if (retryCount <= maxRetries) {
+        // Only retry for network-related errors, not for permanent errors
+        const shouldRetry = error.message.includes('network') || 
+                           error.message.includes('timeout') ||
+                           error.message.includes('fetch') ||
+                           (typeof (error as any).status === 'number' && (error as any).status >= 500);
+
+        if (retryCount <= maxRetries && shouldRetry) {
           console.log(`Upload failed, retrying... (${retryCount}/${maxRetries})`);
-          await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before retry
+          await new Promise(resolve => setTimeout(resolve, 300)); // Reduced retry delay
         } else {
-          break; // No more retries
+          break; // No more retries for permanent errors
         }
       }
 
@@ -369,9 +382,9 @@ export const FileUpload = ({
               className="mb-2"
             >
               <Upload className="w-4 h-4 mr-2" />
-              {processingFile ? 'Processing...' : 
+              {processingFile ? 'Optimizing...' : 
                uploading ? 'Uploading...' : 
-               `Upload ${type}`}
+               `Choose ${type}`}
             </Button>
             <p className="text-sm text-gray-500">
               or drag and drop {type} here
@@ -393,7 +406,6 @@ export const FileUpload = ({
             accept={accept}
             onChange={handleFileSelect}
             className="hidden"
-            capture={type === 'image' ? 'environment' : undefined}
           />
         </div>
       )}
