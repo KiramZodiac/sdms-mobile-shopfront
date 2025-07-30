@@ -57,8 +57,8 @@ export const Footer = () => {
               <div className="flex items-start space-x-3">
                 <MapPin className="w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0" />
                 <span className="text-gray-400">
-                  Kampala, Uganda<br />
-                  Downtown Electronics Plaza
+                  Arua Park Plaza Shop Number C1-287<br />
+                  William Street Kampala-Uganda
                 </span>
               </div>
               <div className="flex items-center space-x-3">

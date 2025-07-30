@@ -65,18 +65,33 @@ export const CategoryForm = ({ category, onClose, onSave }: CategoryFormProps) =
     }));
   };
 
-  const analyzerUrl = 'https://rvteqxtonbgjuhztnzpx.supabase.co/functions/v1/analyze-product-image';
+  const analyzerUrl = 'https://rvteqxtonbgjuhztnzpx.supabase.co/functions/v1/-product-image';
 
   const handleImageUpload = async (url: string) => {
     setFormData(prev => ({ ...prev, image_url: url }));
     // Only auto-describe if description is empty
     if (!formData.description) {
       try {
+        toast({
+          title: 'AI Analysis',
+          description: 'Analyzing image with AI...',
+        });
+        
+        // Call the public analyzer function (no authentication needed)
         const response = await fetch(analyzerUrl, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+          },
           body: JSON.stringify({ imageUrl: url }),
         });
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Analyzer API error:', response.status, errorText);
+          throw new Error(`Analyzer service unavailable (${response.status})`);
+        }
+        
         const data = await response.json();
         if (data.description) {
           setFormData(prev => ({ ...prev, description: data.description }));

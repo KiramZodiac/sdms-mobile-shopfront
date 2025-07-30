@@ -416,8 +416,7 @@ const Admin = () => {
     const handleLogout = async () => {
       try {
         await signOut();
-        localStorage.removeItem('sb-rvteqxtonbgjuhztnzpx-auth-token');
-        sessionStorage.clear();
+        // Let the auth system handle token cleanup, only clear our custom admin session
         localStorage.removeItem('admin-session');
         toast({
           title: 'Session Ended',
@@ -435,40 +434,32 @@ const Admin = () => {
     }
   }, [location.pathname, admin, authLoading, signOut, toast, navigate]);
 
-  // Security event listeners
+  // Security event listeners - only clear session when actually leaving admin area
   useEffect(() => {
     if (!admin) return;
 
-    const handleBeforeUnload = () => {
-      localStorage.removeItem('sb-rvteqxtonbgjuhztnzpx-auth-token');
-      sessionStorage.clear();
-      localStorage.removeItem('admin-session');
-    };
-
     const handleVisibilityChange = () => {
+      // Only sign out if user switches away from admin area, not just hiding the tab
       if (document.hidden && !location.pathname.startsWith('/admin')) {
         signOut();
-        localStorage.removeItem('sb-rvteqxtonbgjuhztnzpx-auth-token');
-        sessionStorage.clear();
+        // Let the auth system handle token cleanup, don't manually clear Supabase tokens
         localStorage.removeItem('admin-session');
       }
     };
 
     const handlePopState = () => {
+      // Only sign out when navigating away from admin area
       if (!location.pathname.startsWith('/admin')) {
         signOut();
-        localStorage.removeItem('sb-rvteqxtonbgjuhztnzpx-auth-token');
-        sessionStorage.clear();
+        // Let the auth system handle token cleanup, don't manually clear Supabase tokens
         localStorage.removeItem('admin-session');
       }
     };
 
-    window.addEventListener('beforeunload', handleBeforeUnload);
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('popstate', handlePopState);
 
     return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('popstate', handlePopState);
     };
@@ -477,8 +468,9 @@ const Admin = () => {
   const handleSignOut = async () => {
     try {
       await signOut();
-      localStorage.clear();
-      sessionStorage.clear();
+      // Let the auth system handle token cleanup, only clear our custom admin session
+      localStorage.removeItem('admin-session');
+      localStorage.removeItem('simple_admin_session');
       toast({
         title: 'Signed Out',
         description: 'You have been successfully signed out.',

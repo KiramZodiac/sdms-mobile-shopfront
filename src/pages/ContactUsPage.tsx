@@ -59,8 +59,8 @@ const ContactUsPage = () => {
                       <h3 className="text-xl font-semibold text-gray-800 mb-2">Location</h3>
                       <p className="text-gray-600">Visit our showroom</p>
                       <p className="text-gray-700 font-medium">
-                        Kampala, Uganda<br />
-                        Central Business District
+                        Arua Park Plaza Shop Number C1-287<br />
+                        William Street Kampala-Uganda
                       </p>
                     </div>
                   </div>

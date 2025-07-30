@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { FileUpload } from './FileUpload';
 import { X } from 'lucide-react';
+import { useSimpleAdminAuth } from '@/hooks/useSimpleAdminAuth';
 
 interface Product {
   id?: string;
@@ -47,6 +48,7 @@ interface ProductFormProps {
 }
 
 export const ProductForm = ({ product, categories, onClose, onSave }: ProductFormProps) => {
+  const { admin, loading: authLoading } = useSimpleAdminAuth();
   const [formData, setFormData] = useState<Product>({
     name: '',
     price: 0,
@@ -93,7 +95,6 @@ export const ProductForm = ({ product, categories, onClose, onSave }: ProductFor
           updated.sku = generateSKU(value);
         }
       }
-      // If switching from preorder to regular product, clear preorder fields
       if (field === 'is_preorder' && !value) {
         updated.preorder_availability_date = undefined;
         updated.preorder_description = undefined;
@@ -106,31 +107,37 @@ export const ProductForm = ({ product, categories, onClose, onSave }: ProductFor
 
   const handleImageUpload = async (url: string) => {
     if (formData.images.length >= 3) {
-      toast({
-        title: "Limit reached",
-        description: "You can only upload up to 3 images per product",
-        variant: "destructive",
-      });
+      toast({ title: "Limit reached", description: "Max 3 images per product", variant: "destructive" });
       return;
     }
 
-    setFormData(prev => ({
-      ...prev,
-      images: [...prev.images, url]
-    }));
+    setFormData(prev => ({ ...prev, images: [...prev.images, url] }));
 
     if (formData.images.length === 0 && !formData.description && !formData.name && !formData.features?.length && !formData.short_description && !formData.sku) {
       try {
-        const session = await supabase.auth.getSession();
-        const access_token = session.data.session?.access_token;
+        toast({ title: 'AI Analysis', description: 'Analyzing image with AI...' });
+
+        // Call the public analyzer function (no authentication needed)
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) {
+          console.error('Error fetching session:', error);
+        }
+
         const response = await fetch(analyzerUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${access_token}`,
+            'Authorization': `Bearer ${session?.access_token}`,
           },
-          body: JSON.stringify({ image_url: url }),
+          body: JSON.stringify({ imageUrl: url }),
         });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Analyzer API error:', response.status, errorText);
+          throw new Error(`Analyzer service unavailable (${response.status})`);
+        }
+
         const data = await response.json();
         if (data.title && data.description && data.features && data.short_description && data.sku) {
           setFormData(prev => ({
@@ -140,21 +147,14 @@ export const ProductForm = ({ product, categories, onClose, onSave }: ProductFor
             description: data.description,
             short_description: data.short_description,
             sku: data.sku,
-            features: data.features
+            features: data.features,
           }));
-          toast({
-            title: 'AI Fields Generated',
-            description: 'Title, SKU, description, short description, and features generated from image.',
-          });
+          toast({ title: 'AI Fields Generated', description: 'Fields generated from image' });
         } else {
           throw new Error('Incomplete data returned');
         }
       } catch (err) {
-        toast({
-          title: 'AI Generation Failed',
-          description: 'Could not generate fields from image.',
-          variant: 'destructive',
-        });
+        toast({ title: 'AI Generation Failed', description: 'Could not generate fields', variant: 'destructive' });
       }
     }
   };
@@ -183,11 +183,10 @@ export const ProductForm = ({ product, categories, onClose, onSave }: ProductFor
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-  
+
     try {
-      // ✅ Remove the invalid "categories" key
       const { categories, ...cleanFormData } = formData as any;
-  
+
       const productData = {
         ...cleanFormData,
         price: Number(cleanFormData.price),
@@ -202,17 +201,17 @@ export const ProductForm = ({ product, categories, onClose, onSave }: ProductFor
         preorder_availability_date: cleanFormData.preorder_availability_date || null,
         preorder_description: cleanFormData.preorder_description || null,
       };
-  
+
       console.log('Submitting productData:', JSON.stringify(productData, null, 2));
-  
+
       if (product?.id) {
         const { error } = await supabase
           .from('products')
           .update(productData)
           .eq('id', product.id);
-  
+
         if (error) throw error;
-  
+
         toast({
           title: "Success",
           description: "Product updated successfully",
@@ -221,15 +220,15 @@ export const ProductForm = ({ product, categories, onClose, onSave }: ProductFor
         const { error } = await supabase
           .from('products')
           .insert([productData]);
-  
+
         if (error) throw error;
-  
+
         toast({
           title: "Success",
           description: "Product created successfully",
         });
       }
-  
+
       onSave();
     } catch (error) {
       console.error('Save error:', error);
@@ -243,13 +242,12 @@ export const ProductForm = ({ product, categories, onClose, onSave }: ProductFor
     }
   };
 
-  // Format date for input field (YYYY-MM-DD)
   const formatDateForInput = (dateString?: string) => {
     if (!dateString) return '';
     const date = new Date(dateString);
     return date.toISOString().split('T')[0];
   };
-  
+
   return (
     <Dialog open={true} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -363,7 +361,6 @@ export const ProductForm = ({ product, categories, onClose, onSave }: ProductFor
             />
           </div>
 
-          {/* Pre-order Section */}
           <div className="space-y-4 border-t pt-4">
             <div className="flex items-center space-x-2">
               <Checkbox
