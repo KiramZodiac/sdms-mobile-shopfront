@@ -10,8 +10,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { ProductForm } from "@/components/admin/ProductForm";
 import { CategoryForm } from "@/components/admin/CategoryForm";
 import { BannerForm } from "@/components/admin/BannerForm";
-import { AdminLogin } from "@/components/admin/AdminLogin";
-import { useAdminAuth } from "@/hooks/useAdminAuth";
+
+import { useSimpleAdminAuth } from "@/hooks/useSimpleAdminAuth";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ErrorBoundary } from "react-error-boundary";
 import { ShopImageCarouselForm } from "@/components/admin/ShopImageCarouselForm";
@@ -117,7 +117,7 @@ const useSearch = (items: Product[], searchFields: (keyof Product)[]) => {
 };
 
 const Admin = () => {
-  const { admin, loading: authLoading, signOut } = useAdminAuth();
+  const { admin, loading: authLoading, signOut } = useSimpleAdminAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [banners, setBanners] = useState<Banner[]>([]);
@@ -150,6 +150,7 @@ const Admin = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const dataLoadedRef = useRef(false);
+  const adminIdRef = useRef<string | null>(null); // Track admin ID to detect changes
 
   // Reset product page when searching
   useEffect(() => {
@@ -168,9 +169,15 @@ const Admin = () => {
     lowStockProducts: products.filter(p => p.stock_quantity < 10).length,
   }), [products, categories, banners]);
 
-  // Optimized data fetching function
+  // Optimized data fetching function - ENHANCED VERSION
   const fetchAllAdminData = useCallback(async () => {
-    console.log('fetchAllAdminData called');
+    console.log('fetchAllAdminData called with pagination:', {
+      productPage: productPagination.page,
+      categoryPage: categoryPagination.page,
+      bannerPage: bannerPagination.page,
+      carouselPage: carouselPagination.page
+    });
+    
     try {
       setLoading(true);
       
@@ -199,6 +206,20 @@ const Admin = () => {
           .order('display_order')
           .range((carouselPagination.page - 1) * itemsPerPage, carouselPagination.page * itemsPerPage - 1)
       ]);
+
+      // Log results for debugging
+      console.log('Data fetch results:', {
+        products: productsResult.data?.length || 0,
+        categories: categoriesResult.data?.length || 0,
+        banners: bannersResult.data?.length || 0,
+        carousel: carouselResult.data?.length || 0,
+        errors: {
+          products: productsResult.error,
+          categories: categoriesResult.error,
+          banners: bannersResult.error,
+          carousel: carouselResult.error
+        }
+      });
 
       if (productsResult.error) throw productsResult.error;
       if (categoriesResult.error) throw categoriesResult.error;
@@ -344,18 +365,49 @@ const Admin = () => {
     handleCloseForm(formType);
   }, [fetchAllAdminData, handleCloseForm]);
 
-  // Load data effect
+  // Load data effect - FIXED VERSION
   useEffect(() => {
-    console.log('Admin useEffect triggered:', { admin, authLoading });
-    if (!admin || dataLoadedRef.current) return;
+    console.log('Admin useEffect triggered:', { admin, authLoading, adminId: admin?.username });
+    
+    // Don't load if still authenticating
+    if (authLoading) return;
+    
+    // Don't load if no admin
+    if (!admin) {
+      dataLoadedRef.current = false;
+      adminIdRef.current = null;
+      return;
+    }
 
-    const loadData = async () => {
-      dataLoadedRef.current = true;
-      await fetchAllAdminData();
-    };
+    // Check if admin changed (new login) or if data hasn't been loaded yet
+    const adminChanged = adminIdRef.current !== admin.username;
+    const shouldLoadData = !dataLoadedRef.current || adminChanged;
 
-    loadData();
-  }, [admin, fetchAllAdminData]);
+    if (shouldLoadData) {
+      console.log('Loading admin data - reason:', adminChanged ? 'admin changed' : 'first load');
+      
+      const loadData = async () => {
+        try {
+          // Reset pagination to first page on new load
+          if (adminChanged) {
+            productPagination.resetPage();
+            categoryPagination.resetPage();
+            bannerPagination.resetPage();
+            carouselPagination.resetPage();
+          }
+          
+          await fetchAllAdminData();
+          dataLoadedRef.current = true;
+          adminIdRef.current = admin.username;
+        } catch (error) {
+          console.error('Error loading admin data:', error);
+          dataLoadedRef.current = false;
+        }
+      };
+
+      loadData();
+    }
+  }, [admin, authLoading, fetchAllAdminData, productPagination, categoryPagination, bannerPagination, carouselPagination]);
 
   // Session management effects (keeping the original logic)
   useEffect(() => {
@@ -431,7 +483,7 @@ const Admin = () => {
         title: 'Signed Out',
         description: 'You have been successfully signed out.',
       });
-      navigate('/admin/login');
+      navigate('/');
     } catch (error) {
       console.error('Error signing out:', error);
       toast({
@@ -459,7 +511,7 @@ const Admin = () => {
   }
 
   if (!admin) {
-    return <AdminLogin />;
+    return null; // This should not happen as SimpleProtectedRoute handles this
   }
 
   return (
@@ -468,7 +520,7 @@ const Admin = () => {
         <div className="mb-4 sm:mb-8 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
           <div>
             <h1 className="text-xl sm:text-3xl font-bold text-gray-900 mb-1">Admin Dashboard</h1>
-            <p className="text-gray-600 text-xs sm:text-base">Welcome back, {admin.email}</p>
+            <p className="text-gray-600 text-xs sm:text-base">Welcome back, {admin.username}</p>
           </div>
           <Button variant="outline" onClick={handleSignOut} className="w-full sm:w-auto text-xs sm:text-sm h-8 sm:h-10">
             <LogOut className="w-3 h-3 sm:w-4 sm:h-4 mr-2" />
