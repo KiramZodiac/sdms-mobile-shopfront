@@ -10,7 +10,7 @@ export const Layout = () => {
     <div className="min-h-screen bg-gray-50">
       <Marquee />
       <Navbar />
-      <main>
+      <main className="pb-4 md:pb-0">
         <Outlet />
       </main>
       

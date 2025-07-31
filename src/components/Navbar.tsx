@@ -71,35 +71,65 @@ export const Navbar = () => {
 
             {/* Right side navigation items */}
             <div className="flex items-center space-x-2 lg:space-x-6 ml-auto">
+              {/* Desktop Navigation Links */}
               <a
                 href="/"
-                className="text-white/90 hover:text-white font-medium transition-colors text-sm lg:text-base hidden sm:block"
+                className="text-white/90 hover:text-white font-medium transition-colors text-sm lg:text-base hidden md:block"
               >
                 Home
               </a>
               <a
-                href="/"
-                className="text-white/90 hover:text-white font-medium transition-colors sm:hidden p-1 rounded-full hover:bg-gray-100"
-              >
-                {/* <Home className="w-4 h-4 lg:w-5 lg:h-5" /> */}
-              </a>
-              <a
                 href="/products"
-                className=" max-sm:hidden text-white/90 hover:text-white font-medium transition-colors text-sm lg:text-base hidden sm:block"
+                className="text-white/90 hover:text-white font-medium transition-colors text-sm lg:text-base hidden md:block"
               >
                 Products
               </a>
               <a
-                href="/products"
-                className="text-white/90 hover:text-white font-medium transition-colors sm:hidden p-1 rounded-full hover:bg-gray-100"
+                href="/aboutUsPage"
+                className="text-white/90 hover:text-white font-medium transition-colors text-sm lg:text-base hidden lg:block"
               >
-                {/* <ShoppingBag className="w-4 h-4 lg:w-5 lg:h-5" /> */}
+                About
               </a>
-              <CartButton />
+              <a
+                href="/contactUsPage"
+                className="text-white/90 hover:text-white font-medium transition-colors text-sm lg:text-base hidden lg:block"
+              >
+                Contact
+              </a>
+              
+              {/* Mobile Icons */}
+              <a
+                href="/"
+                className="md:hidden text-white/90 hover:text-white p-2 rounded-full hover:bg-white/10 transition-colors"
+              >
+                <Home className="w-5 h-5" />
+              </a>
+              <a
+                href="/products"
+                className="md:hidden text-white/90 hover:text-white p-2 rounded-full hover:bg-white/10 transition-colors"
+              >
+                <ShoppingBag className="w-5 h-5" />
+              </a>
+              
+              {/* Cart Button - Desktop/Tablet only */}
+              <div className="hidden md:block">
+                <CartButton />
+              </div>
+              
+              {/* Call to Action Button */}
+              <a
+                href="tel:+256755869853"
+                className="hidden sm:flex items-center bg-white/20 hover:bg-white/30 text-white px-3 py-2 rounded-full text-sm font-medium transition-colors"
+              >
+                <span className="mr-2">📞</span>
+                <span className="hidden lg:inline">Call Now</span>
+              </a>
+              
+              {/* Currency Display */}
               <div className="bg-white/20 text-white px-3 py-1 rounded-full text-sm font-medium">
                 <span className="flex items-center space-x-1">
-                  <span className="text-2xl">🇺🇬</span>
-                  <span className="hidden sm:inline">UGX</span>
+                  <span className="text-lg">🇺🇬</span>
+                  <span className="hidden sm:inline text-xs">UGX</span>
                 </span>
               </div>
             </div>

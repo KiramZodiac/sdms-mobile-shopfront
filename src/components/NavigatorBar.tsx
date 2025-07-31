@@ -13,9 +13,118 @@ import {
 import { faWhatsapp } from '@fortawesome/free-brands-svg-icons';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
+import { CartButton } from './CartButton';
+/**
+ * Redesigned Mobile Bottom Navigation Bar for a more visually appealing and professional look.
+ * - Modern floating glassmorphism style
+ * - Animated active tab indicator
+ * - Category drawer with icons and images
+ * - Subtle shadow and rounded corners
+ * - Large, touch-friendly icons
+ */
+
+import clsx from "clsx";
+
+const NAV_HEIGHT = 68;
+
+const navItems = [
+  {
+    id: "home",
+    label: "Home",
+    icon: faHome,
+    color: "text-orange-500",
+    link: "/",
+  },
+  {
+    id: "categories",
+    label: "Categories",
+    icon: faTh,
+    color: "text-orange-500",
+    action: null, // Will open sidebar
+  },
+  {
+    id: "call",
+    label: "Call",
+    icon: faPhone,
+    color: "text-orange-500",
+    action: () => window.location.href = "tel:+256755869853",
+  },
+  {
+    id: "whatsapp",
+    label: "WhatsApp",
+    icon: faWhatsapp,
+    color: "text-green-500",
+    action: () => window.open("https://wa.me/256755869853", "_blank"),
+  },
+];
+
+const CategoryDrawer = ({ open, onClose, categories, loading, onCategoryClick }) => (
+  <div
+    className={clsx(
+      "fixed inset-0 z-50 transition-all duration-300",
+      open ? "pointer-events-auto" : "pointer-events-none"
+    )}
+    style={{ background: open ? "rgba(0,0,0,0.35)" : "rgba(0,0,0,0)" }}
+    onClick={onClose}
+  >
+    <div
+      className={clsx(
+        "absolute left-0 top-0 h-full w-4/5 max-w-xs bg-white dark:bg-gray-900 shadow-2xl rounded-r-2xl p-5 transition-transform duration-300",
+        open ? "translate-x-0" : "-translate-x-full"
+      )}
+      onClick={e => e.stopPropagation()}
+    >
+      <div className="flex items-center justify-between mb-4">
+        <span className="text-lg font-semibold text-gray-800 dark:text-gray-100">Categories</span>
+        <button
+          className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition"
+          onClick={onClose}
+        >
+          <FontAwesomeIcon icon={faTimes} className="text-gray-500" />
+        </button>
+      </div>
+      {loading ? (
+        <div className="text-center text-gray-400 py-8">Loading...</div>
+      ) : (
+        <ul className="space-y-3">
+          {categories.map((cat) => (
+            <li key={cat.id}>
+              <button
+                className="flex items-center w-full px-3 py-2 rounded-lg hover:bg-orange-50 dark:hover:bg-gray-800 transition group"
+                onClick={() => {
+                  onCategoryClick(cat);
+                  onClose();
+                }}
+              >
+                {cat.image_url ? (
+                  <img
+                    src={cat.image_url}
+                    alt={cat.name}
+                    className="w-8 h-8 rounded-lg object-cover mr-3 border border-gray-200 dark:border-gray-700"
+                  />
+                ) : (
+                  <FontAwesomeIcon icon={faListAlt} className="w-7 h-7 mr-3 text-orange-400" />
+                )}
+                <span className="text-gray-800 dark:text-gray-100 font-medium flex-1 text-left">
+                  {cat.name}
+                </span>
+                {cat.count > 0 && (
+                  <span className="ml-2 text-xs bg-orange-100 text-orange-600 rounded-full px-2 py-0.5">
+                    {cat.count}
+                  </span>
+                )}
+                <FontAwesomeIcon icon={faChevronRight} className="ml-2 text-gray-300 group-hover:text-orange-400" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  </div>
+);
 
 const MobileBottomNavigation = () => {
-  const [activeTab, setActiveTab] = useState('home');
+  const [activeTab, setActiveTab] = useState("home");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -28,187 +137,151 @@ const MobileBottomNavigation = () => {
         const { data, error } = await supabase
           .from("categories")
           .select("id, name, image_url, is_active, count");
-
         if (error) throw error;
-
-        const activeCategories = data.filter((category) => category.is_active);
-        setCategories(activeCategories);
+        setCategories((data || []).filter((c) => c.is_active));
       } catch (error) {
         console.error("Error fetching categories:", error);
       } finally {
         setLoading(false);
       }
     };
-
     fetchCategories();
   }, []);
 
-  const navItems = [
-    {
-      id: 'call',
-      label: 'Call to Order',
-      icon: faPhone,
-      color: 'text-orange-500',
-      action: () => window.location.href = 'tel:+256755869853'
-    },
-    {
-      id: 'home',
-      label: 'Home',
-      icon: faHome,
-      color: 'text-orange-500',
-      link: '/',
-      hasNotification: false
-    },
-    {
-      id: 'categories',
-      label: 'Categories',
-      icon: faListAlt,
-      color: 'text-orange-500',
-      action: () => setSidebarOpen(!sidebarOpen),
-      hasNotification: true
-    },
-    {
-      id: 'whatsapp',
-      label: 'WhatsApp',
-      icon: faWhatsapp,
-      color: 'text-green-500',
-      action: () => window.location.href = 'https://wa.me/+256755869853',
-      hasNotification: true
-    },
-    {
-      id: 'location',
-      label: 'Location',
-      icon: faMapMarkerAlt,
-      color: 'text-red-500',
-      action: () => window.location.href = 'https://www.google.com/maps/place/Stanbic+Bank+%7C+William+Street+Branch/@0.3157357,32.5724852,17z'
+  // Handle navigation and actions
+  const handleNavClick = (item) => {
+    setActiveTab(item.id);
+    if (item.id === "categories") {
+      setSidebarOpen(true);
+    } else if (item.link) {
+      navigate(item.link);
+    } else if (item.action) {
+      item.action();
     }
-  ];
+  };
 
+  // Handle category click
+  const handleCategoryClick = (cat) => {
+    navigate(`/products?category=${encodeURIComponent(cat.name)}`);
+  };
+
+  // Only show on mobile
   return (
-    <div className="w-full max-w-md mx-auto bg-gray-100 relative">
-      {/* Sidebar Overlay */}
-      {sidebarOpen && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
-          onClick={() => setSidebarOpen(false)}
-          role="button"
-          aria-label="Close sidebar"
-        />
-      )}
-
-      {/* Sidebar */}
-      <div className={`fixed top-0 left-0 h-full w-3/4 bg-white bg-opacity-90 backdrop-blur-sm shadow-lg transform transition-transform duration-300 ease-in-out z-50 md:hidden ${
-        sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-      }`}>
-        {/* Sidebar Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-orange-500 text-white">
-          <h2 className="text-lg font-semibold">Categories</h2>
-          <button 
-            onClick={() => setSidebarOpen(false)}
-            className="p-1 hover:bg-orange-600 rounded"
-            aria-label="Close sidebar"
-          >
-            <FontAwesomeIcon icon={faTimes} size="lg" />
-          </button>
-        </div>
-
-        {/* Categories List */}
-        <div className="p-4 max-h-[calc(100vh-100px)] overflow-y-auto">
-  {loading ? (
-    <p className="text-gray-500">Loading categories...</p>
-  ) : (
-    <div className="space-y-2">
-      {categories.map((category) => (
-        <button
-          key={category.id}
-          className="w-full flex items-center justify-between p-3 rounded-lg hover:bg-gray-100 transition-colors duration-200 text-left"
-          onClick={() => {
-            navigate(`/products?category=${category.name.toLowerCase()}`);
-            setActiveTab('categories');
-            setSidebarOpen(false);
-          }}
-          role="menuitem"
-          aria-label={`View ${category.name} category`}
-        >
-          <div className="flex items-center">
-            <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center mr-3 overflow-hidden">
-              <img 
-                src={category.image_url} 
-                alt={category.name}
-                className="w-full h-full object-cover"
-              />
-            </div>
-            <div>
-              <p className="font-medium text-gray-900">{category.name}</p>
-              <p className="text-sm text-gray-500">{category.count} items</p>
-            </div>
-          </div>
-          <FontAwesomeIcon icon={faChevronRight} className="text-gray-400" />
-        </button>
-      ))}
-    </div>
-  )}
-</div>
-
-
-
-        {/* Sidebar Footer */}
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200 bg-gray-50">
-          <button 
-            className="w-full bg-orange-500 text-white py-2 px-4 rounded-lg hover:bg-orange-600 transition-colors duration-200"
-            aria-label="View all categories"
-          >
-            View All Categories
-          </button>
-        </div>
-      </div>
-
-      {/* Bottom Navigation */}
-      <div className="fixed bottom-0 left-0 right-0 bg-gray-800 text-white shadow-lg md:hidden z-50">
-        <div className="flex justify-around items-center py-2">
-          {navItems.map((item) => {
-            const isActive = activeTab === item.id;
-            
+    <>
+      <nav
+        className="fixed bottom-0 left-0 right-0 z-40 w-full md:hidden
+          bg-white/90 dark:bg-gray-900/90 backdrop-blur-md shadow-xl
+          flex items-center justify-between px-2 py-2 border-t border-gray-200/20"
+        style={{
+          height: NAV_HEIGHT,
+          boxShadow: "0 -2px 20px 0 rgba(0, 0, 0, 0.1)",
+        }}
+      >
+        {navItems.map((item, idx) => {
+          // Insert CartButton after categories (index 1)
+          if (idx === 1) {
             return (
-              <button
-                key={item.id}
-                onClick={() => {
-                  setActiveTab(item.id);
-                  if (item.action) {
-                    item.action();
-                  } else if (item.link) {
-                    navigate(item.link);
-                  }
-                }}
-                className={`flex flex-col items-center justify-center py-2 px-1 relative transition-colors duration-200 ${
-                  isActive ? 'text-orange-400' : 'text-gray-300'
-                } hover:text-orange-400`}
-                aria-label={item.label}
-                role="tab"
-                aria-selected={isActive}
-              >
-                <div className="relative">
-                  <FontAwesomeIcon 
-                    icon={item.icon} 
-                    size="lg"
-                    className={`mb-1 size-7 ${isActive ? item.color : item.id === 'whatsapp' ? 'text-green-500 ' : ''}`}
-                  />
-                  {item.hasNotification && (
-                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full flex items-center justify-center">
-                      <span className="text-white text-xs font-bold">1</span>
-                    </div>
+              <React.Fragment key={`${item.id}-fragment`}>
+                {/* Regular nav item */}
+                <button
+                  key={item.id}
+                  className={clsx(
+                    "flex flex-col items-center justify-center flex-1 py-1 transition group relative",
+                    "focus:outline-none",
+                    activeTab === item.id ? "text-orange-600" : "text-gray-500 dark:text-gray-300"
                   )}
+                  onClick={() => handleNavClick(item)}
+                  style={{ minWidth: 0 }}
+                >
+                  <span
+                    className={clsx(
+                      "flex items-center justify-center w-11 h-11 rounded-full transition-all duration-200",
+                      activeTab === item.id
+                        ? "bg-orange-100/80 dark:bg-orange-900/40 shadow-md scale-110"
+                        : "bg-transparent"
+                    )}
+                  >
+                    <FontAwesomeIcon icon={item.icon} className={clsx("text-xl", item.color)} />
+                  </span>
+                  <span
+                    className={clsx(
+                      "text-xs font-medium mt-1 transition-colors",
+                      activeTab === item.id ? "text-orange-600" : "text-gray-500 dark:text-gray-300"
+                    )}
+                  >
+                    {item.label}
+                  </span>
+                  {/* Animated active indicator */}
+                  {activeTab === item.id && (
+                    <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-6 h-1 rounded-full bg-orange-500/80 animate-pulse" />
+                  )}
+                </button>
+                
+                {/* Cart Button */}
+                <div 
+                  key="cart-button"
+                  className="flex flex-col items-center justify-center flex-1 py-1 relative"
+                  style={{ minWidth: 0 }}
+                >
+                  <div className="scale-75 transform">
+                    <CartButton />
+                  </div>
                 </div>
-                <span className="text-xs text-center leading-tight max-w-16">
-                  {item.label}
-                </span>
-              </button>
+              </React.Fragment>
             );
-          })}
-        </div>
-      </div>
-    </div>
+          }
+          
+          // Regular nav items
+          return (
+            <button
+              key={item.id}
+              className={clsx(
+                "flex flex-col items-center justify-center flex-1 py-1 transition group relative",
+                "focus:outline-none",
+                activeTab === item.id ? "text-orange-600" : "text-gray-500 dark:text-gray-300"
+              )}
+              onClick={() => handleNavClick(item)}
+              style={{ minWidth: 0 }}
+            >
+              <span
+                className={clsx(
+                  "flex items-center justify-center w-11 h-11 rounded-full transition-all duration-200",
+                  activeTab === item.id
+                    ? "bg-orange-100/80 dark:bg-orange-900/40 shadow-md scale-110"
+                    : "bg-transparent"
+                )}
+              >
+                <FontAwesomeIcon icon={item.icon} className={clsx("text-xl", item.color)} />
+              </span>
+              <span
+                className={clsx(
+                  "text-xs font-medium mt-1 transition-colors",
+                  activeTab === item.id ? "text-orange-600" : "text-gray-500 dark:text-gray-300"
+                )}
+              >
+                {item.label}
+              </span>
+              {/* Animated active indicator */}
+              {activeTab === item.id && (
+                <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-6 h-1 rounded-full bg-orange-500/80 animate-pulse" />
+              )}
+            </button>
+          );
+        })}
+      </nav>
+      {/* Category Drawer */}
+      <CategoryDrawer
+        open={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        categories={categories}
+        loading={loading}
+        onCategoryClick={handleCategoryClick}
+      />
+      {/* Spacer for nav height - prevents content from being hidden behind nav */}
+      <div className="h-[76px] md:hidden" />
+    </>
   );
 };
 
 export default MobileBottomNavigation;
+
