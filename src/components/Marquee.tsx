@@ -68,7 +68,7 @@ export const Marquee = () => {
           >
             Call us at +256 755 869 853
           </a>{" "}
-          | Email: info@sdmelectronics.ug
+          | Email: sdmelectronics256@gmail.com
         </span>
 
         {/* Right decorative SVG */}

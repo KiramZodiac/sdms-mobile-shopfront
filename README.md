@@ -1,73 +1,138 @@
-# Welcome to your Lovable project
+# SDM Electronics Mobile Shopfront
 
-## Project info
+## Project Description
 
-**URL**: https://lovable.dev/projects/5d059fad-ee14-44e4-804d-d1c0854fb097
+A modern, responsive e-commerce platform for SDM Electronics - Uganda's premier destination for quality electronics and gadgets. Built with React, TypeScript, and Supabase.
 
-## How can I edit this code?
+## Features
 
-There are several ways of editing your application.
+- 🛍️ Complete e-commerce functionality with cart and checkout
+- 📱 Mobile-first responsive design with bottom navigation
+- 💳 Flutterwave payment integration
+- 🏪 Comprehensive admin dashboard for product management
+- 🔍 Advanced product search and filtering
+- 📦 Real-time inventory management
+- 🎨 Modern UI with Tailwind CSS and shadcn/ui
+- 🔐 Secure authentication and authorization
+- 📊 Analytics integration with Vercel Analytics
+- ⚡ PWA support with service worker caching
+- 🎯 SEO optimized with proper meta tags
 
-**Use Lovable**
+## Technologies Used
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/5d059fad-ee14-44e4-804d-d1c0854fb097) and start prompting.
+- **Frontend**: React 18, TypeScript, Vite
+- **Styling**: Tailwind CSS, shadcn/ui components
+- **Backend**: Supabase (Database, Authentication, Storage)
+- **Payment**: Flutterwave integration
+- **Analytics**: Vercel Analytics & Speed Insights
+- **Deployment**: Vercel with optimized configurations
 
-Changes made via Lovable will be committed automatically to this repo.
+## Getting Started
 
-**Use your preferred IDE**
+### Prerequisites
+- Node.js 18+ and npm installed
+- Supabase project set up
+- Flutterwave account for payments
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### Installation
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+```bash
+# Clone the repository
+git clone <your-repo-url>
+cd sdms-mobile-shopfront
 
-Follow these steps:
+# Install dependencies
+npm install
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+# Set up environment variables
+cp .env.example .env.local
+# Fill in your actual environment variables
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Start development server
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+### Environment Variables
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+Required environment variables (see `.env.example`):
 
-**Use GitHub Codespaces**
+```env
+VITE_SUPABASE_URL=your_supabase_project_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+VITE_FLUTTERWAVE_PUBLIC_KEY=your_flutterwave_public_key
+OPENAI_API_KEY=your_openai_api_key
+```
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## Project Structure
 
-## What technologies are used for this project?
+```
+src/
+├── components/          # Reusable UI components
+│   ├── admin/          # Admin dashboard components
+│   └── ui/             # shadcn/ui components
+├── hooks/              # Custom React hooks
+├── integrations/       # External service integrations
+├── pages/              # Main application pages
+└── lib/                # Utility functions and helpers
+```
 
-This project is built with:
+## Deployment
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+### Production Checklist
+- ✅ Security headers configured
+- ✅ Environment variables set
+- ✅ Database migrations applied
+- ✅ Storage policies secured
+- ✅ PWA manifest configured
+- ✅ Analytics integrated
 
-## How can I deploy this project?
+### Deploy to Vercel
 
-Simply open [Lovable](https://lovable.dev/projects/5d059fad-ee14-44e4-804d-d1c0854fb097) and click on Share -> Publish.
+```bash
+# Build for production
+npm run build
 
-## Can I connect a custom domain to my Lovable project?
+# Deploy (if using Vercel CLI)
+vercel deploy --prod
+```
 
-Yes, you can!
+The project includes optimized Vercel configuration with:
+- Security headers (CSP, XSS protection)
+- Static asset caching
+- Proper routing for SPA
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+## Key Features
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+### Customer Features
+- Browse products by categories
+- Advanced search and filtering
+- Product details with images/videos
+- Shopping cart functionality
+- Secure checkout with Flutterwave
+- Mobile-optimized navigation
+
+### Admin Features
+- Product management (CRUD operations)
+- Category management
+- Banner/carousel management
+- Marquee text configuration
+- Real-time inventory tracking
+- Secure admin authentication
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test thoroughly
+5. Submit a pull request
+
+## License
+
+Private project for SDM Electronics Uganda.
+
+## Support
+
+For technical support or questions:
+- Email: info@sdmelectronics.ug
+- Phone: +256 755 869 853

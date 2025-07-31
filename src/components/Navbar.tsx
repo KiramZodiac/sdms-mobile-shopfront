@@ -6,16 +6,49 @@ import { useNavigate } from "react-router-dom";
 export const Navbar = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [isScrolled, setIsScrolled] = useState(false);
+  const [imageError, setImageError] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+    let lastScrollTop = 0;
+    let isScrolling = false;
+
     const handleScroll = () => {
       const scrollTop = window.scrollY;
-      setIsScrolled(scrollTop > 100); // Hide other parts when scrolled more than 100px
+      
+      // Clear existing timeout
+      clearTimeout(timeoutId);
+      
+      // Set scrolling flag
+      isScrolling = true;
+      
+      // Debounce with timeout to prevent rapid changes
+      timeoutId = setTimeout(() => {
+        // Only update if scroll position is significantly different
+        const scrollDifference = Math.abs(scrollTop - lastScrollTop);
+        
+        if (scrollDifference > 10) { // Minimum scroll threshold
+          if (scrollTop > 150) {
+            setIsScrolled(true);
+          } else if (scrollTop < 50) {
+            setIsScrolled(false);
+          }
+          // Do nothing in the middle range (50-150px) to prevent flickering
+        }
+        
+        lastScrollTop = scrollTop;
+        isScrolling = false;
+      }, 100); // 100ms debounce delay
     };
 
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      clearTimeout(timeoutId);
+    };
   }, []);
 
   const handleSearch = (e) => {
@@ -35,38 +68,40 @@ export const Navbar = () => {
       <nav className="bg-gradient-to-r from-orange-500 to-orange-600 shadow-md">
         <div className="container mx-auto px-4 lg:px-8 py-3">
           <div
-            className={`flex items-center justify-between w-full flex-wrap gap-4 transition-all duration-300 ${
-              isScrolled ? "max-h-0 opacity-0 py-0 overflow-hidden" : "max-h-20 opacity-100"
+            className={`flex items-center justify-between w-full flex-wrap gap-4 transition-all duration-500 ease-in-out ${
+              isScrolled ? "max-h-0 opacity-0 py-0 overflow-hidden transform scale-95" : "max-h-20 opacity-100 transform scale-100"
             }`}
           >
             {/* Logo with Image */}
-            <a href="/" className="flex items-center space-x-3 flex-shrink-0">
-              <img 
-                src="./sdmlogo.png" 
-                alt="SDM Electronics Logo" 
-                className="w-12 h-12 lg:w-16 lg:h-16 object-contain rounded-lg shadow-md bg-white/10 p-1"
-                onError={(e) => {
-                  // Fallback to text logo if image fails to load
-                  // e.target.style.display = 'none';
-                  // e.target.nextElementSibling.style.display = 'flex';
-                }}
-              />
+            <a href="/" className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0">
+              {!imageError ? (
+                                  <img 
+                    src="/sdmlogo.png" 
+                    alt="SDM Electronics Logo" 
+                    className={`w-10 h-10 sm:w-12 sm:h-12 lg:w-16 lg:h-16 object-contain rounded-lg shadow-md bg-white/10 p-1 transition-opacity duration-200 ${
+                      imageLoaded ? 'opacity-100' : 'opacity-0'
+                    }`}
+                  onLoad={() => setImageLoaded(true)}
+                  onError={() => {
+                    console.log('Logo image failed to load, using fallback');
+                    setImageError(true);
+                  }}
+                />
+                             ) : (
+                 /* Fallback text logo */
+                 <div className="w-10 h-10 sm:w-12 sm:h-12 lg:w-16 lg:h-16 bg-gradient-to-br from-blue-500 to-blue-700 rounded-full flex items-center justify-center shadow-md">
+                   <span className="text-white font-extrabold text-sm sm:text-lg lg:text-xl">SDM</span>
+                 </div>
+               )}
               
-
-              {/* Fallback text logo (hidden by default) */}
-              <div className="hidden flex-col items-center">
-                <div className="w-12 h-12 lg:w-16 lg:h-16 bg-gradient-to-br from-blue-500 to-blue-700 rounded-full flex items-center justify-center shadow-md">
-                  <span className="text-white font-extrabold text-lg lg:text-xl">SDM</span>
-                </div>
-              </div>
-              {/* <div className="flex flex-col">
-                <span className="text-lg lg:text-xl font-bold text-white">
+              <div className="flex flex-col justify-center">
+                <span className="text-sm sm:text-lg lg:text-xl font-bold text-white leading-tight">
                   SDM Electronics
                 </span>
-                <span className="text-xs lg:text-sm text-white/80">
+                <span className="text-xs lg:text-sm text-white/80 leading-tight hidden sm:block">
                   Quality Electronics
                 </span>
-              </div> */}
+              </div>
             </a>
 
             {/* Right side navigation items */}
