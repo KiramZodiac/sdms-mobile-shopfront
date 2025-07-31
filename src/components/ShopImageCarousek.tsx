@@ -115,6 +115,7 @@ const ShopImageCarousel = () => {
 
   return (
     <div className="relative w-full max-w-6xl mx-auto bg-gray-100 rounded-lg overflow-hidden shadow-lg pb-5">
+      <h1 className="text-center text-2xl font-bold py-4">Our Shop </h1>
       {/* Main carousel */}
       <div
         className="relative h-48 sm:h-64 md:h-72 lg:h-96 overflow-hidden"

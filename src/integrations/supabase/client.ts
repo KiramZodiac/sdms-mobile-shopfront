@@ -20,10 +20,12 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, 
 });
 
 supabase.auth.onAuthStateChange((event, session) => {
-  console.log('[Supabase Auth Change]', event);
-  if (session) {
-    console.log('User session:', session);
-  } else {
-    console.log('User signed out or no session');
+  if (import.meta.env.DEV) {
+    console.log('[Supabase Auth Change]', event);
+    if (session) {
+      console.log('User session:', session);
+    } else {
+      console.log('User signed out or no session');
+    }
   }
 });

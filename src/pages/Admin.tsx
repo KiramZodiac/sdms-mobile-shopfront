@@ -1,15 +1,26 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRef } from "react";
-import { Plus, Edit, Trash2, Eye, EyeOff, Package, BarChart3, Users, ShoppingBag, LogOut, Image, Search, X, ExternalLink, Calendar, Star } from "lucide-react";
+import { Plus, Edit, Trash2, Eye, EyeOff, Package, BarChart3, Users, ShoppingBag, LogOut, Image, Search, X, ExternalLink, Calendar, Star, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { ProductForm } from "@/components/admin/ProductForm";
 import { CategoryForm } from "@/components/admin/CategoryForm";
 import { BannerForm } from "@/components/admin/BannerForm";
+import { MarqueeForm } from "@/components/admin/MarqueeForm";
 
 import { useSimpleAdminAuth } from "@/hooks/useSimpleAdminAuth";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -44,6 +55,7 @@ interface Product {
   reviews_count?: number;
   slug: string;
   sku?: string;
+  condition?: 'new' | 'used' | 'like_new' | 'refurbished' | 'open_box';
   categories?: {
     name: string;
     slug: string;
@@ -58,6 +70,8 @@ interface Category {
   image_url?: string;
   is_active: boolean;
 }
+
+
 
 interface Banner {
   id: string;
@@ -78,6 +92,11 @@ interface ShopImageCarousel {
   image_url: string;
   display_order: number;
   is_active: boolean;
+}
+
+interface ProductToDelete {
+  id: string;
+  name: string;
 }
 
 // Custom hook for managing pagination
@@ -130,6 +149,13 @@ const Admin = () => {
   const [showBannerForm, setShowBannerForm] = useState(false);
   const [showCarouselForm, setShowCarouselForm] = useState(false);
   
+  // Delete dialog state
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [categoryToDelete, setCategoryToDelete] = useState<Category | null>(null);
+  const [productsToDelete, setProductsToDelete] = useState<ProductToDelete[]>([]);
+  const [showProductDeleteDialog, setShowProductDeleteDialog] = useState(false);
+  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
+  
   // Editing state
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
@@ -181,12 +207,20 @@ const Admin = () => {
     try {
       setLoading(true);
       
+      // For products: if searching, fetch all; otherwise use pagination
+      const hasSearch = productSearch.searchQuery.trim().length > 0;
+      
       const [productsResult, categoriesResult, bannersResult, carouselResult] = await Promise.all([
-        supabase
-          .from('products')
-          .select(`*, categories(name, slug)`)
-          .order('created_at', { ascending: false })
-          .range((productPagination.page - 1) * itemsPerPage, productPagination.page * itemsPerPage - 1),
+        hasSearch 
+          ? supabase
+              .from('products')
+              .select(`*, categories(name, slug)`)
+              .order('created_at', { ascending: false })
+          : supabase
+              .from('products')
+              .select(`*, categories(name, slug)`)
+              .order('created_at', { ascending: false })
+              .range((productPagination.page - 1) * itemsPerPage, productPagination.page * itemsPerPage - 1),
         
         supabase
           .from('categories')
@@ -246,6 +280,7 @@ const Admin = () => {
     categoryPagination.page, 
     bannerPagination.page, 
     carouselPagination.page,
+    productSearch.searchQuery,
     toast
   ]);
 
@@ -317,6 +352,137 @@ const Admin = () => {
     };
   }, [toast]);
 
+  // Function to initiate category deletion (shows dialog)
+  const initiateDeleteCategory = useCallback(async (id: string) => {
+    try {
+      // Find the category to delete
+      const category = categories.find(c => c.id === id);
+      if (!category) return;
+
+      // Check if there are products associated with this category
+      const { data: productsInCategory, error: checkError } = await supabase
+        .from('products')
+        .select('id, name')
+        .eq('category_id', id);
+
+      if (checkError) throw checkError;
+
+      // Set up the dialog state
+      setCategoryToDelete(category);
+      setProductsToDelete(productsInCategory || []);
+      setShowDeleteDialog(true);
+    } catch (error) {
+      console.error('Error checking category products:', error);
+      toast({
+        title: "Error",
+        description: "Failed to check category dependencies",
+        variant: "destructive",
+      });
+    }
+  }, [categories, toast]);
+
+  // Function to handle confirmed deletion
+  const handleConfirmDelete = useCallback(async () => {
+    if (!categoryToDelete) return;
+
+    try {
+      // If there are products to delete, delete them first
+      if (productsToDelete.length > 0) {
+        const productIds = productsToDelete.map(p => p.id);
+        const { error: deleteProductsError } = await supabase
+          .from('products')
+          .delete()
+          .in('id', productIds);
+
+        if (deleteProductsError) throw deleteProductsError;
+
+        // Update the products state to remove deleted products
+        setProducts(prev => prev.filter(product => !productIds.includes(product.id)));
+
+        toast({
+          title: "Products Deleted",
+          description: `${productsToDelete.length} product(s) deleted successfully`,
+        });
+      }
+
+      // Now delete the category
+      const { error } = await supabase
+        .from('categories')
+        .delete()
+        .eq('id', categoryToDelete.id);
+
+      if (error) throw error;
+
+      setCategories(prev => prev.filter(category => category.id !== categoryToDelete.id));
+      toast({
+        title: "Success",
+        description: "Category deleted successfully",
+      });
+
+      // Close dialog and reset state
+      setShowDeleteDialog(false);
+      setCategoryToDelete(null);
+      setProductsToDelete([]);
+    } catch (error) {
+      console.error('Error deleting category:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete category",
+        variant: "destructive",
+      });
+    }
+  }, [categoryToDelete, productsToDelete, toast]);
+
+  // Function to cancel deletion
+  const handleCancelDelete = useCallback(() => {
+    setShowDeleteDialog(false);
+    setCategoryToDelete(null);
+    setProductsToDelete([]);
+  }, []);
+
+  // Function to initiate product deletion (shows dialog)
+  const initiateDeleteProduct = useCallback((product: Product) => {
+    setProductToDelete(product);
+    setShowProductDeleteDialog(true);
+  }, []);
+
+  // Function to handle confirmed product deletion
+  const handleConfirmDeleteProduct = useCallback(async () => {
+    if (!productToDelete) return;
+
+    try {
+      const { error } = await supabase
+        .from('products')
+        .delete()
+        .eq('id', productToDelete.id);
+
+      if (error) throw error;
+
+      setProducts(prev => prev.filter(product => product.id !== productToDelete.id));
+      toast({
+        title: "Success",
+        description: "Product deleted successfully",
+      });
+
+      // Close dialog and reset state
+      setShowProductDeleteDialog(false);
+      setProductToDelete(null);
+    } catch (error) {
+      console.error('Error deleting product:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete product",
+        variant: "destructive",
+      });
+    }
+  }, [productToDelete, toast]);
+
+  // Function to cancel product deletion
+  const handleCancelDeleteProduct = useCallback(() => {
+    setShowProductDeleteDialog(false);
+    setProductToDelete(null);
+  }, []);
+
   // Specific toggle and delete functions using the generic ones
   const toggleProductStatus = createToggleFunction('products', 'is_active', setProducts, 'Product');
   const toggleProductFeatured = createToggleFunction('products', 'is_featured', setProducts, 'Product');
@@ -325,7 +491,6 @@ const Admin = () => {
   const toggleCarouselActive = createToggleFunction('carousel_images', 'is_active', setCarouselItems, 'Carousel image');
 
   const deleteProduct = createDeleteFunction('products', setProducts, 'Are you sure you want to delete this product?');
-  const deleteCategory = createDeleteFunction('categories', setCategories, 'Are you sure you want to delete this category?');
   const deleteBanner = createDeleteFunction('banners', setBanners, 'Are you sure you want to delete this banner?');
   const deleteCarouselItem = createDeleteFunction('carousel_images', setCarouselItems, 'Are you sure you want to delete this carousel image?');
 
@@ -365,7 +530,7 @@ const Admin = () => {
     handleCloseForm(formType);
   }, [fetchAllAdminData, handleCloseForm]);
 
-  // Load data effect - FIXED VERSION
+  // Initial load effect
   useEffect(() => {
     console.log('Admin useEffect triggered:', { admin, authLoading, adminId: admin?.username });
     
@@ -407,7 +572,23 @@ const Admin = () => {
 
       loadData();
     }
-  }, [admin, authLoading, fetchAllAdminData, productPagination, categoryPagination, bannerPagination, carouselPagination]);
+  }, [admin, authLoading]);
+
+  // Pagination change effect - fetch data when pagination changes
+  useEffect(() => {
+    // Only fetch if admin is loaded and data has been initially loaded
+    if (admin && dataLoadedRef.current) {
+      fetchAllAdminData();
+    }
+  }, [
+    productPagination.page, 
+    categoryPagination.page, 
+    bannerPagination.page, 
+    carouselPagination.page,
+    productSearch.searchQuery,
+    admin,
+    fetchAllAdminData
+  ]);
 
   // Session management effects (keeping the original logic)
   useEffect(() => {
@@ -579,11 +760,12 @@ const Admin = () => {
         </div>
 
         <Tabs defaultValue="products" className="space-y-3 sm:space-y-4">
-          <TabsList className="grid w-full grid-cols-4 h-8 sm:h-10">
+          <TabsList className="grid w-full grid-cols-5 h-8 sm:h-10">
             <TabsTrigger value="products" className="text-xs sm:text-sm">Products</TabsTrigger>
             <TabsTrigger value="categories" className="text-xs sm:text-sm">Categories</TabsTrigger>
             <TabsTrigger value="banners" className="text-xs sm:text-sm">Banners</TabsTrigger>
-            <TabsTrigger value="carousel" className="text-xs sm:text-sm">Shop Carousel</TabsTrigger>
+            <TabsTrigger value="carousel" className="text-xs sm:text-sm">Carousel</TabsTrigger>
+            <TabsTrigger value="marquee" className="text-xs sm:text-sm">Marquee</TabsTrigger>
           </TabsList>
 
           <TabsContent value="products" className="space-y-3 sm:space-y-4">
@@ -599,17 +781,19 @@ const Admin = () => {
                     variant="outline"
                     size="sm"
                     onClick={productPagination.prevPage}
-                    disabled={productPagination.page === 1}
+                    disabled={productPagination.page === 1 || productSearch.searchQuery.trim().length > 0}
                     className="text-xs h-7"
                   >
                     Prev
                   </Button>
-                  <span className="text-xs">Page {productPagination.page}</span>
+                  <span className="text-xs">
+                    {productSearch.searchQuery.trim().length > 0 ? 'All Results' : `Page ${productPagination.page}`}
+                  </span>
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={productPagination.nextPage}
-                    disabled={productSearch.filteredItems.length < itemsPerPage}
+                    disabled={productSearch.searchQuery.trim().length > 0 || products.length < itemsPerPage}
                     className="text-xs h-7"
                   >
                     Next
@@ -753,7 +937,7 @@ const Admin = () => {
                             <Button
                               size="sm"
                               variant="destructive"
-                              onClick={() => deleteProduct(product.id)}
+                              onClick={() => initiateDeleteProduct(product)}
                               className="h-6 w-6 p-0"
                             >
                               <Trash2 className="w-3 h-3" />
@@ -847,7 +1031,7 @@ const Admin = () => {
                       <Button
                         size="sm"
                         variant="destructive"
-                        onClick={() => deleteCategory(category.id)}
+                        onClick={() => initiateDeleteCategory(category.id)}
                         className="h-6 w-6 sm:h-8 sm:w-8 p-0"
                       >
                         <Trash2 className="w-3 h-3" />
@@ -1011,6 +1195,13 @@ const Admin = () => {
               onToggleActive={toggleCarouselActive}
             />
           </TabsContent>
+
+          <TabsContent value="marquee" className="space-y-3 sm:space-y-4">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+              <h2 className="text-lg sm:text-2xl font-bold">Website Marquee</h2>
+            </div>
+            <MarqueeForm />
+          </TabsContent>
         </Tabs>
 
         {/* Form Modals */}
@@ -1046,6 +1237,121 @@ const Admin = () => {
             onSave={() => handleSaveForm('carousel')}
           />
         )}
+
+        {/* Delete Category Confirmation Dialog */}
+        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+          <AlertDialogContent className="max-w-md">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2 text-red-600">
+                <AlertTriangle className="w-5 h-5" />
+                Delete Category
+              </AlertDialogTitle>
+              <AlertDialogDescription className="text-left space-y-3">
+                {productsToDelete.length > 0 ? (
+                  <div className="space-y-3">
+                    <p className="font-medium text-gray-900">
+                      You are about to delete the category <span className="font-bold text-red-600">"{categoryToDelete?.name}"</span>
+                    </p>
+                    <p className="text-sm text-gray-700">
+                      This category has <span className="font-bold text-red-600">{productsToDelete.length}</span> product(s) assigned to it:
+                    </p>
+                    <div className="bg-red-50 p-3 rounded-lg border-l-4 border-red-200">
+                      <ul className="text-sm text-gray-700 space-y-1">
+                        {productsToDelete.slice(0, 5).map((product, index) => (
+                          <li key={product.id} className="flex items-center gap-2">
+                            <span className="w-2 h-2 bg-red-400 rounded-full flex-shrink-0"></span>
+                            {product.name}
+                          </li>
+                        ))}
+                        {productsToDelete.length > 5 && (
+                          <li className="text-red-600 font-medium">
+                            ... and {productsToDelete.length - 5} more product(s)
+                          </li>
+                        )}
+                      </ul>
+                    </div>
+                    <div className="bg-yellow-50 p-3 rounded-lg border-l-4 border-yellow-200">
+                      <p className="text-sm text-yellow-800">
+                        <span className="font-bold">⚠️ Warning:</span> Clicking "Delete Everything" will permanently delete both the category and ALL associated products. This action cannot be undone.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <p className="font-medium text-gray-900">
+                      Are you sure you want to delete the category <span className="font-bold text-red-600">"{categoryToDelete?.name}"</span>?
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      This category has no products assigned to it. This action cannot be undone.
+                    </p>
+                  </div>
+                )}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="gap-2">
+              <AlertDialogCancel onClick={handleCancelDelete} className="flex-1">
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={handleConfirmDelete} 
+                className="flex-1 bg-red-600 hover:bg-red-700 focus:ring-red-500"
+              >
+                {productsToDelete.length > 0 ? 'Delete Everything' : 'Delete Category'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Delete Product Confirmation Dialog */}
+        <AlertDialog open={showProductDeleteDialog} onOpenChange={setShowProductDeleteDialog}>
+          <AlertDialogContent className="max-w-md">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2 text-red-600">
+                <AlertTriangle className="w-5 h-5" />
+                Delete Product
+              </AlertDialogTitle>
+              <AlertDialogDescription className="text-left space-y-3">
+                <div className="space-y-3">
+                  <p className="font-medium text-gray-900">
+                    Are you sure you want to delete the product <span className="font-bold text-red-600">"{productToDelete?.name}"</span>?
+                  </p>
+                  <div className="bg-red-50 p-3 rounded-lg border-l-4 border-red-200">
+                    <div className="flex items-center gap-3">
+                      {productToDelete?.images?.[0] && (
+                        <img
+                          src={productToDelete.images[0]}
+                          alt={productToDelete.name}
+                          className="w-12 h-12 object-cover rounded-lg flex-shrink-0"
+                        />
+                      )}
+                      <div>
+                        <p className="font-medium text-gray-900">{productToDelete?.name}</p>
+                        <p className="text-sm text-gray-600">{formatPrice(productToDelete?.price || 0)}</p>
+                        <p className="text-xs text-gray-500">Stock: {productToDelete?.stock_quantity}</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="bg-yellow-50 p-3 rounded-lg border-l-4 border-yellow-200">
+                    <p className="text-sm text-yellow-800">
+                      <span className="font-bold">⚠️ Warning:</span> This action cannot be undone. The product will be permanently removed from your inventory.
+                    </p>
+                  </div>
+                </div>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="gap-2">
+              <AlertDialogCancel onClick={handleCancelDeleteProduct} className="flex-1">
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={handleConfirmDeleteProduct} 
+                className="flex-1 bg-red-600 hover:bg-red-700 focus:ring-red-500"
+              >
+                Delete Product
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </ErrorBoundary>
   );

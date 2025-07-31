@@ -32,6 +32,7 @@ interface Product {
   view_count?: number;
   is_preorder?: boolean;
   preorder_availability_date?: string;
+  condition?: 'new' | 'used' | 'like_new' | 'refurbished' | 'open_box';
   categories?: {
     name: string;
     slug: string;
@@ -322,7 +323,9 @@ export default function ProductDetail() {
           url: window.location.href,
         });
       } catch (error) {
-        console.log('Error sharing:', error);
+        if (import.meta.env.DEV) {
+          console.log('Error sharing:', error);
+        }
       }
     } else {
       try {
@@ -453,7 +456,22 @@ export default function ProductDetail() {
         <div className="space-y-6">
           <div>
             <div className="flex items-center justify-between mb-2">
-              {product.categories && <Badge variant="outline">{product.categories.name}</Badge>}
+              <div className="flex items-center gap-2">
+                {product.categories && <Badge variant="outline">{product.categories.name}</Badge>}
+                {product.condition && (
+                  <Badge className={`text-white text-xs px-2 py-1 ${
+                    product.condition === 'new' ? 'bg-blue-500' :
+                    product.condition === 'used' ? 'bg-gray-500' :
+                    product.condition === 'like_new' ? 'bg-green-500' :
+                    product.condition === 'refurbished' ? 'bg-purple-500' :
+                    product.condition === 'open_box' ? 'bg-orange-500' : 'bg-gray-500'
+                  }`}>
+                    {product.condition === 'like_new' ? 'LIKE NEW' :
+                     product.condition === 'open_box' ? 'OPEN BOX' :
+                     product.condition.toUpperCase()}
+                  </Badge>
+                )}
+              </div>
               <div className="flex items-center gap-2 text-sm text-gray-500">
                 <Eye className="w-4 h-4" />
                 {formatViewCount(product.view_count || 0)} views

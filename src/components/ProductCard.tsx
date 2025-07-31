@@ -20,6 +20,7 @@ interface Product {
   slug: string;
   is_preorder: boolean;
   preorder_availability_date?: string;
+  condition?: 'new' | 'used' | 'like_new' | 'refurbished' | 'open_box';
   categories?: { name: string; slug: string };
 }
 
@@ -113,6 +114,22 @@ export const ProductCard = memo(
                   {Math.floor(getDiscountPercentage(product.original_price, product.price))}% OFF
                 </Badge>
               )}
+            
+            {/* Condition Badge */}
+            {product.condition && (
+              <Badge className={`absolute top-2 right-2 text-white text-[10px] px-2 py-0.5 ${
+                product.condition === 'new' ? 'bg-blue-500' :
+                product.condition === 'used' ? 'bg-gray-500' :
+                product.condition === 'like_new' ? 'bg-green-500' :
+                product.condition === 'refurbished' ? 'bg-purple-500' :
+                product.condition === 'open_box' ? 'bg-orange-500' : 'bg-gray-500'
+              }`}>
+                {product.condition === 'like_new' ? 'LIKE NEW' :
+                 product.condition === 'open_box' ? 'OPEN BOX' :
+                 product.condition.toUpperCase()}
+              </Badge>
+            )}
+          
 
             {/* View Count */}
             <div className="absolute bottom-2 left-2 bg-black/70 text-white px-2 py-0.5 rounded-full text-[10px] flex items-center gap-1">

@@ -30,6 +30,7 @@ interface Product {
   slug: string;
   sku?: string;
   category_id?: string;
+  condition?: 'new' | 'used' | 'like_new' | 'refurbished' | 'open_box';
   specifications?: any;
   features?: string[];
 }
@@ -61,6 +62,7 @@ export const ProductForm = ({ product, categories, onClose, onSave }: ProductFor
     is_preorder: false,
     slug: '',
     sku: '',
+    condition: 'new',
     features: [],
   });
   const [loading, setLoading] = useState(false);
@@ -324,6 +326,25 @@ export const ProductForm = ({ product, categories, onClose, onSave }: ProductFor
                       {category.name}
                     </SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="condition">Condition *</Label>
+              <Select 
+                value={formData.condition || 'new'} 
+                onValueChange={(value) => handleInputChange('condition', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select condition" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="new">New</SelectItem>
+                  <SelectItem value="used">Used</SelectItem>
+                  <SelectItem value="like_new">Like New</SelectItem>
+                  <SelectItem value="refurbished">Refurbished</SelectItem>
+                  <SelectItem value="open_box">Open Box</SelectItem>
                 </SelectContent>
               </Select>
             </div>

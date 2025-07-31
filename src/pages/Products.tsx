@@ -27,6 +27,7 @@ interface Product {
   view_count?: number;
   is_preorder: boolean;
   preorder_availability_date?: string;
+  condition?: 'new' | 'used' | 'like_new' | 'refurbished' | 'open_box';
 }
 
 interface Category {
@@ -153,12 +154,30 @@ const ProductCard = ({ product, viewMode, onAddToCart }: {
           )}
         </div>
 
-        <div className="absolute top-2 right-2 flex flex-col gap-1">
+        {/* View Count */}
+        <div className="absolute bottom-2 left-2">
           <div className="bg-black bg-opacity-60 text-white px-2 py-1 rounded-full text-xs flex items-center gap-1">
             <Eye className="w-3 h-3" />
             {formatViewCount(product.view_count || 0)}
           </div>
         </div>
+
+        {/* Condition Badge */}
+        {product.condition && (
+          <div className="absolute top-2 right-2 flex flex-col gap-1">
+            <Badge className={`text-white text-[10px] px-2 py-0.5 ${
+              product.condition === 'new' ? 'bg-blue-500' :
+              product.condition === 'used' ? 'bg-gray-500' :
+              product.condition === 'like_new' ? 'bg-green-500' :
+              product.condition === 'refurbished' ? 'bg-purple-500' :
+              product.condition === 'open_box' ? 'bg-orange-500' : 'bg-gray-500'
+            }`}>
+              {product.condition === 'like_new' ? 'LIKE NEW' :
+               product.condition === 'open_box' ? 'OPEN BOX' :
+               product.condition.toUpperCase()}
+            </Badge>
+          </div>
+        )}
       </div>
 
       {/* Product Info */}
@@ -321,6 +340,7 @@ const Products = () => {
           view_count,
           is_preorder,
           preorder_availability_date,
+          condition,
           categories!inner(name, slug)
         `, { count: 'exact' })
         .eq('is_active', true);
@@ -384,6 +404,7 @@ const Products = () => {
         view_count: product.view_count || 0,
         is_preorder: product.is_preorder || false,
         preorder_availability_date: product.preorder_availability_date,
+        condition: product.condition,
       })) || [];
 
       setProducts(transformedProducts);

@@ -1,10 +1,10 @@
 self.addEventListener('install', (event) => {
-    console.log('Service Worker installed');
+    // Service Worker installed - logs removed for production
     self.skipWaiting();
   });
   
   self.addEventListener('activate', (event) => {
-    console.log('Service Worker activated');
+    // Service Worker activated - logs removed for production
   });
   
   self.addEventListener('fetch', (event) => {

@@ -23,8 +23,16 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker
       .register('/service-worker.js')
-      .then(reg => console.log('Service Worker registered:', reg))
-      .catch(err => console.error('Service Worker error:', err));
+      .then(reg => {
+        if (import.meta.env.DEV) {
+          console.log('Service Worker registered:', reg);
+        }
+      })
+      .catch(err => {
+        if (import.meta.env.DEV) {
+          console.error('Service Worker error:', err);
+        }
+      });
   });
 }
 // This code is for registering a service worker to enable offline capabilities and caching for the app.

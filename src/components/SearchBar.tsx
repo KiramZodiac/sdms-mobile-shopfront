@@ -13,6 +13,7 @@ interface Product {
   price: number;
   images: string[];
   slug: string;
+  condition?: 'new' | 'used' | 'like_new' | 'refurbished' | 'open_box';
 }
 
 export const SearchBar = () => {

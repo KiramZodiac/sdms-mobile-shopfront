@@ -19,7 +19,9 @@ const InstallPWA = () => {
     promptEvent.prompt();
     promptEvent.userChoice.then((choiceResult: any) => {
       if (choiceResult.outcome === 'accepted') {
-        console.log('PWA installed');
+        if (import.meta.env.DEV) {
+          console.log('PWA installed');
+        }
       }
       setPromptEvent(null);
       setVisible(false);

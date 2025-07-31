@@ -23,6 +23,7 @@ interface Product {
   slug: string;
   is_preorder: boolean;
   preorder_availability_date?: string;
+  condition?: 'new' | 'used' | 'like_new' | 'refurbished' | 'open_box';
   categories?: { name: string; slug: string };
 }
 
@@ -61,13 +62,15 @@ export const FeaturedProducts = () => {
         .select(`
           id, name, price, original_price, description, short_description, 
           images, stock_quantity, rating, reviews_count, slug, view_count,
-          is_preorder, preorder_availability_date,
+          is_preorder, preorder_availability_date, condition,
           categories(name, slug)
         `)
         .eq("is_active", true)
         .eq("is_featured", true)
         .limit(12)
         .order("created_at", { ascending: false });
+
+      // Data loaded successfully
 
       if (error) throw error;
 
@@ -77,6 +80,7 @@ export const FeaturedProducts = () => {
         images: product.images || [],
         view_count: product.view_count || 0,
         is_preorder: product.is_preorder || false,
+        condition: product.condition,
       })) || [];
 
       setProducts(transformedProducts);
