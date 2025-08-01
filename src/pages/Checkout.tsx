@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useCart } from "@/hooks/useCart";
 import { CartItems } from "@/components/CartItems";
@@ -16,12 +15,12 @@ const Checkout = () => {
   const [loading, setLoading] = useState(false);
   const [customerData, setCustomerData] = useState({
     firstName: "",
-    lastName: "",
+    // lastName: "",
     phone: "",
-    email: "",
-    address: "",
-    city: "",
-    district: "",
+    // email: "",
+    // address: "",
+    // city: "",
+    // district: "",
     notes: ""
   });
 
@@ -49,7 +48,7 @@ const Checkout = () => {
       return;
     }
 
-    if (!customerData.firstName || !customerData.lastName || !customerData.phone) {
+    if (!customerData.firstName || !customerData.phone) {
       toast({
         title: "Missing Information",
         description: "Please fill in all required fields",
@@ -66,12 +65,12 @@ const Checkout = () => {
         .from('customers')
         .insert([{
           first_name: customerData.firstName,
-          last_name: customerData.lastName,
           phone: customerData.phone,
-          email: customerData.email || null,
-          address: customerData.address || null,
-          city: customerData.city || null,
-          district: customerData.district || null,
+          // last_name: customerData.lastName,
+          // email: customerData.email || null,
+          // address: customerData.address || null,
+          // city: customerData.city || null,
+          // district: customerData.district || null,
         }])
         .select()
         .single();
@@ -84,8 +83,7 @@ const Checkout = () => {
 
       if (orderNumberError) throw orderNumberError;
 
-      // Create order (without shipping fee)
-      const orderTotal = total; // Excludes shipping
+      const orderTotal = total;
 
       const { data: order, error: orderError } = await supabase
         .from('orders')
@@ -104,7 +102,6 @@ const Checkout = () => {
 
       if (orderError) throw orderError;
 
-      // Create order items
       const orderItems = items.map(item => ({
         order_id: order.id,
         product_id: item.id,
@@ -119,18 +116,18 @@ const Checkout = () => {
 
       if (itemsError) throw itemsError;
 
-      // WhatsApp message
       const itemsList = items.map(item =>
         `${item.name} - Qty: ${item.quantity} - ${formatPrice(item.price * item.quantity)}`
       ).join('\n');
 
       const customerDetails = [
-        `Name: ${customerData.firstName} ${customerData.lastName}`,
+        `Name: ${customerData.firstName}`,
         `Phone: ${customerData.phone}`,
-        customerData.email && `Email: ${customerData.email}`,
-        customerData.address && `Address: ${customerData.address}`,
-        customerData.city && `City: ${customerData.city}`,
-        customerData.district && `District: ${customerData.district}`
+        // customerData.lastName && `Last Name: ${customerData.lastName}`,
+        // customerData.email && `Email: ${customerData.email}`,
+        // customerData.address && `Address: ${customerData.address}`,
+        // customerData.city && `City: ${customerData.city}`,
+        // customerData.district && `District: ${customerData.district}`
       ].filter(Boolean).join('\n');
 
       const message = `New Order: ${orderNumber}
@@ -147,9 +144,8 @@ Total (excluding shipping): ${formatPrice(orderTotal)}
 
 ${customerData.notes ? `Notes: ${customerData.notes}` : ''}`;
 
-      const whatsappUrl = `https://wa.me/+256755869853?text=${encodeURIComponent(message)}`;
+      const whatsappUrl = `https://wa.me/+256751214095?text=${encodeURIComponent(message)}`;
 
-      // Save WhatsApp URL
       await supabase
         .from('orders')
         .update({ whatsapp_chat_url: whatsappUrl })
@@ -180,13 +176,11 @@ ${customerData.notes ? `Notes: ${customerData.notes}` : ''}`;
       <h1 className="text-3xl font-bold text-gray-900 mb-8">Checkout</h1>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Cart Items */}
         <div>
           <h2 className="text-xl font-semibold mb-4">Your Order</h2>
           <CartItems />
         </div>
 
-        {/* Customer Details Form */}
         <div>
           <Card>
             <CardHeader>
@@ -194,26 +188,25 @@ ${customerData.notes ? `Notes: ${customerData.notes}` : ''}`;
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="firstName">First Name *</Label>
-                    <Input
-                      id="firstName"
-                      value={customerData.firstName}
-                      onChange={(e) => handleInputChange('firstName', e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="lastName">Last Name *</Label>
-                    <Input
-                      id="lastName"
-                      value={customerData.lastName}
-                      onChange={(e) => handleInputChange('lastName', e.target.value)}
-                      required
-                    />
-                  </div>
+                <div>
+                  <Label htmlFor="firstName">Full Name *</Label>
+                  <Input
+                    id="firstName"
+                    value={customerData.firstName}
+                    onChange={(e) => handleInputChange('firstName', e.target.value)}
+                    required
+                  />
                 </div>
+
+                {/* <div>
+                  <Label htmlFor="lastName">Last Name *</Label>
+                  <Input
+                    id="lastName"
+                    value={customerData.lastName}
+                    onChange={(e) => handleInputChange('lastName', e.target.value)}
+                    required
+                  />
+                </div> */}
 
                 <div>
                   <Label htmlFor="phone">Phone Number *</Label>
@@ -227,7 +220,7 @@ ${customerData.notes ? `Notes: ${customerData.notes}` : ''}`;
                   />
                 </div>
 
-                <div>
+                {/* <div>
                   <Label htmlFor="email">Email (Optional)</Label>
                   <Input
                     id="email"
@@ -263,7 +256,7 @@ ${customerData.notes ? `Notes: ${customerData.notes}` : ''}`;
                       onChange={(e) => handleInputChange('district', e.target.value)}
                     />
                   </div>
-                </div>
+                </div> */}
 
                 <div>
                   <Label htmlFor="notes">Order Notes (Optional)</Label>
@@ -276,9 +269,9 @@ ${customerData.notes ? `Notes: ${customerData.notes}` : ''}`;
                 </div>
 
                 <div className="pt-4 border-t">
-                <div className="text-sm text-gray-600 italic mb-2">
-  * Shipping fee will be confirmed by the seller after reviewing your location. <span className="text-green-600 font-medium">Some products may qualify for free delivery.</span>
-</div>
+                  <div className="text-sm text-gray-600 italic mb-2">
+                    * Shipping fee will be confirmed by the seller after reviewing your location. <span className="text-green-600 font-medium">Some products may qualify for free delivery.</span>
+                  </div>
 
                   <div className="flex justify-between items-center mb-2">
                     <span>Subtotal:</span>
