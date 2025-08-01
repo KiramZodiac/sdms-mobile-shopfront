@@ -144,7 +144,7 @@ Total (excluding shipping): ${formatPrice(orderTotal)}
 
 ${customerData.notes ? `Notes: ${customerData.notes}` : ''}`;
 
-      const whatsappUrl = `https://wa.me/+256751214095?text=${encodeURIComponent(message)}`;
+      const whatsappUrl = `https://wa.me/+256755869853?text=${encodeURIComponent(message)}`;
 
       await supabase
         .from('orders')
