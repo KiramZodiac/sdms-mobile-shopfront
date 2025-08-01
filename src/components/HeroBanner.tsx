@@ -24,7 +24,7 @@ const defaultSlides: BannerSlide[] = [
     image_url: "https://images.unsplash.com/photo-1556656793-08538906a9f8?w=800",
     video_url: null,
     cta_text: "Shop Now",
-    cta_link: "/products/iphone-15-pro",
+    cta_link: "/products/?category=smartphones",
     display_order: 0
   },
   {

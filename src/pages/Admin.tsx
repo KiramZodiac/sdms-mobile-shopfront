@@ -183,17 +183,63 @@ const Admin = () => {
     productPagination.resetPage();
   }, [productSearch.searchQuery]);
 
-  // Memoized stats calculations
-  const stats = useMemo(() => ({
-    totalProducts: products.length,
-    activeProducts: products.filter(p => p.is_active).length,
-    totalCategories: categories.length,
-    activeCategories: categories.filter(c => c.is_active).length,
-    totalBanners: banners.length,
-    activeBanners: banners.filter(b => b.is_active).length,
-    featuredProducts: products.filter(p => p.is_featured).length,
-    lowStockProducts: products.filter(p => p.stock_quantity < 10).length,
-  }), [products, categories, banners]);
+  // Stats state - separate from paginated data
+  const [stats, setStats] = useState({
+    totalProducts: 0,
+    activeProducts: 0,
+    totalCategories: 0,
+    activeCategories: 0,
+    totalBanners: 0,
+    activeBanners: 0,
+    featuredProducts: 0,
+    lowStockProducts: 0,
+  });
+
+  // Fetch stats independently of paginated data
+  const fetchStats = useCallback(async () => {
+    try {
+      const [productsResult, categoriesResult, bannersResult] = await Promise.all([
+        supabase
+          .from('products')
+          .select('is_active, is_featured, stock_quantity')
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('categories')
+          .select('is_active')
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('banners')
+          .select('is_active')
+          .order('created_at', { ascending: false })
+      ]);
+
+      if (productsResult.error) throw productsResult.error;
+      if (categoriesResult.error) throw categoriesResult.error;
+      if (bannersResult.error) throw bannersResult.error;
+
+      const allProducts = productsResult.data || [];
+      const allCategories = categoriesResult.data || [];
+      const allBanners = bannersResult.data || [];
+
+      setStats({
+        totalProducts: allProducts.length,
+        activeProducts: allProducts.filter(p => p.is_active).length,
+        totalCategories: allCategories.length,
+        activeCategories: allCategories.filter(c => c.is_active).length,
+        totalBanners: allBanners.length,
+        activeBanners: allBanners.filter(b => b.is_active).length,
+        featuredProducts: allProducts.filter(p => p.is_featured).length,
+        lowStockProducts: allProducts.filter(p => (p.stock_quantity ?? 0) < 10).length,
+      });
+    } catch (error) {
+      console.error('Error fetching stats:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load dashboard statistics",
+        variant: "destructive",
+      });
+    }
+  }, [toast]);
 
   // Optimized data fetching function - ENHANCED VERSION
   const fetchAllAdminData = useCallback(async () => {
@@ -423,6 +469,9 @@ const Admin = () => {
       setShowDeleteDialog(false);
       setCategoryToDelete(null);
       setProductsToDelete([]);
+      
+      // Refresh stats after deletion
+      fetchStats();
     } catch (error) {
       console.error('Error deleting category:', error);
       toast({
@@ -431,7 +480,7 @@ const Admin = () => {
         variant: "destructive",
       });
     }
-  }, [categoryToDelete, productsToDelete, toast]);
+  }, [categoryToDelete, productsToDelete, toast, fetchStats]);
 
   // Function to cancel deletion
   const handleCancelDelete = useCallback(() => {
@@ -467,6 +516,9 @@ const Admin = () => {
       // Close dialog and reset state
       setShowProductDeleteDialog(false);
       setProductToDelete(null);
+      
+      // Refresh stats after deletion
+      fetchStats();
     } catch (error) {
       console.error('Error deleting product:', error);
       toast({
@@ -475,7 +527,7 @@ const Admin = () => {
         variant: "destructive",
       });
     }
-  }, [productToDelete, toast]);
+  }, [productToDelete, toast, fetchStats]);
 
   // Function to cancel product deletion
   const handleCancelDeleteProduct = useCallback(() => {
@@ -526,9 +578,12 @@ const Admin = () => {
   }, []);
 
   const handleSaveForm = useCallback((formType: 'product' | 'category' | 'banner' | 'carousel') => {
-    fetchAllAdminData();
+    Promise.all([
+      fetchAllAdminData(),
+      fetchStats()
+    ]);
     handleCloseForm(formType);
-  }, [fetchAllAdminData, handleCloseForm]);
+  }, [fetchAllAdminData, fetchStats, handleCloseForm]);
 
   // Initial load effect
   useEffect(() => {
@@ -561,7 +616,10 @@ const Admin = () => {
             carouselPagination.resetPage();
           }
           
-          await fetchAllAdminData();
+          await Promise.all([
+            fetchAllAdminData(),
+            fetchStats()
+          ]);
           dataLoadedRef.current = true;
           adminIdRef.current = admin.username;
         } catch (error) {
@@ -572,7 +630,7 @@ const Admin = () => {
 
       loadData();
     }
-  }, [admin, authLoading]);
+  }, [admin, authLoading, fetchAllAdminData, fetchStats]);
 
   // Pagination change effect - fetch data when pagination changes
   useEffect(() => {
@@ -764,7 +822,7 @@ const Admin = () => {
             <TabsTrigger value="products" className="text-xs sm:text-sm">Products</TabsTrigger>
             <TabsTrigger value="categories" className="text-xs sm:text-sm">Categories</TabsTrigger>
             <TabsTrigger value="banners" className="text-xs sm:text-sm">Banners</TabsTrigger>
-            <TabsTrigger value="carousel" className="text-xs sm:text-sm">Carousel</TabsTrigger>
+            <TabsTrigger value="carousel" className="text-xs sm:text-sm">Shop Images</TabsTrigger>
             <TabsTrigger value="marquee" className="text-xs sm:text-sm">Marquee</TabsTrigger>
           </TabsList>
 

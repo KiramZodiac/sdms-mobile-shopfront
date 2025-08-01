@@ -67,7 +67,7 @@ export const FeaturedCategories = () => {
       </div>
       <div className="px-4">
         {/* Horizontal scrollable container */}
-        <div className="flex overflow-x-auto scrollbar-hide space-x-4 pb-2 md:justify-center md:space-x-8 lg:space-x-12">
+        <div className="flex overflow-x-auto scrollbar-hide w-full  space-x-4 pb-2 transition-shadow   md:space-x-8 lg:space-x-12">
           {categories.map((category) => {
             const IconComponent = getIconForCategory(category.name);
             

@@ -345,17 +345,49 @@ export const FileUpload = ({
               controls
             />
           )}
-          {onRemove && (
+          <div className="absolute top-2 right-2 flex gap-2">
             <Button
               type="button"
-              variant="destructive"
+              variant="secondary"
               size="sm"
-              className="absolute top-2 right-2"
-              onClick={onRemove}
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isProcessing}
+              className="bg-white/90 hover:bg-white text-gray-800 border border-gray-300"
             >
-              <X className="w-4 h-4" />
+              <Upload className="w-4 h-4" />
             </Button>
-          )}
+            {onRemove && (
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                onClick={onRemove}
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            )}
+          </div>
+          <div className="mt-2 text-center">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isProcessing}
+            >
+              <Upload className="w-4 h-4 mr-2" />
+              {processingFile ? 'Optimizing...' : 
+               uploading ? 'Uploading...' : 
+               `Replace ${type}`}
+            </Button>
+          </div>
+          <Input
+            ref={fileInputRef}
+            type="file"
+            accept={accept}
+            onChange={handleFileSelect}
+            className="hidden"
+          />
         </div>
       ) : (
         <div

@@ -36,6 +36,8 @@ export const CategoryForm = ({ category, onClose, onSave }: CategoryFormProps) =
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
+
+
   useEffect(() => {
     if (category) {
       setFormData({
@@ -44,6 +46,14 @@ export const CategoryForm = ({ category, onClose, onSave }: CategoryFormProps) =
         description: category.description || '',
         image_url: category.image_url || '',
         is_active: category.is_active,
+      });
+    } else {
+      setFormData({
+        name: '',
+        slug: '',
+        description: '',
+        image_url: '',
+        is_active: true,
       });
     }
   }, [category]);
@@ -65,7 +75,7 @@ export const CategoryForm = ({ category, onClose, onSave }: CategoryFormProps) =
     }));
   };
 
-  const analyzerUrl = 'https://rvteqxtonbgjuhztnzpx.supabase.co/functions/v1/-product-image';
+  const analyzerUrl = 'https://rvteqxtonbgjuhztnzpx.supabase.co/functions/v1/analyze-product-image';
 
   const handleImageUpload = async (url: string) => {
     setFormData(prev => ({ ...prev, image_url: url }));
@@ -110,6 +120,14 @@ export const CategoryForm = ({ category, onClose, onSave }: CategoryFormProps) =
         });
       }
     }
+  };
+
+  const handleImageRemove = () => {
+    setFormData(prev => ({ ...prev, image_url: '' }));
+    toast({
+      title: 'Image Removed',
+      description: 'Category image has been removed.',
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -176,6 +194,7 @@ export const CategoryForm = ({ category, onClose, onSave }: CategoryFormProps) =
                 onChange={(e) => handleNameChange(e.target.value)}
                 placeholder="Electronics, Appliances, etc."
                 required
+                disabled={loading}
               />
             </div>
 
@@ -187,6 +206,7 @@ export const CategoryForm = ({ category, onClose, onSave }: CategoryFormProps) =
                 onChange={(e) => setFormData(prev => ({ ...prev, slug: e.target.value }))}
                 placeholder="electronics-appliances"
                 required
+                disabled={loading}
               />
             </div>
           </div>
@@ -199,12 +219,14 @@ export const CategoryForm = ({ category, onClose, onSave }: CategoryFormProps) =
               onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
               placeholder="Brief description of the category"
               rows={3}
+              disabled={loading}
             />
           </div>
 
           <div className="space-y-2">
             <FileUpload
               onUpload={handleImageUpload}
+              onRemove={handleImageRemove}
               currentFile={formData.image_url}
               bucket="category-images"
               accept="image/*"
