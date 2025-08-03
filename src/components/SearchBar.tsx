@@ -40,7 +40,7 @@ export const SearchBar = () => {
           .select('id, name, price, images, slug')
           .eq('is_active', true)
           .or(`name.ilike.%${query}%,description.ilike.%${query}%`)
-          .limit(8);
+          .limit(10);
 
         if (error) throw error;
         setResults(data || []);

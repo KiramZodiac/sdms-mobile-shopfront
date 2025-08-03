@@ -171,7 +171,7 @@ const Admin = () => {
   // Search functionality
   const productSearch = useSearch(products, ['name', 'description', 'short_description', 'sku']);
   
-  const itemsPerPage = 10;
+  const itemsPerPage = 20;
   const { toast } = useToast();
   const location = useLocation();
   const navigate = useNavigate();
@@ -271,8 +271,8 @@ const Admin = () => {
         supabase
           .from('categories')
           .select('*')
-          .order('name')
-          .range((categoryPagination.page - 1) * itemsPerPage, categoryPagination.page * itemsPerPage - 1),
+          .order('created_at', { ascending: false }),
+          // .range((categoryPagination.page - 1) * itemsPerPage, categoryPagination.page * itemsPerPage - 1),
         
         supabase
           .from('banners')

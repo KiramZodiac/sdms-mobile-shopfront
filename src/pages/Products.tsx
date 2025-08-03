@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { Filter, Grid, List, Star, ShoppingCart, Eye, Heart, Phone, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -36,9 +36,18 @@ interface Category {
   slug: string;
 }
 
-const PRODUCTS_PER_PAGE = 12;
+const PRODUCTS_PER_PAGE = 20; // Increased from 12 for fewer requests
 
-// Loading skeleton component
+// Cache for products and categories
+const cache = {
+  products: new Map<string, { data: Product[], count: number, timestamp: number }>(),
+  categories: null as Category[] | null,
+  categoriesTimestamp: 0
+};
+
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+// Loading skeleton component - optimized
 const ProductSkeleton = ({ viewMode }: { viewMode: 'grid' | 'list' }) => (
   <div className={`bg-white rounded-xl shadow-sm animate-pulse ${
     viewMode === 'list' ? 'flex gap-4 p-4' : 'overflow-hidden'
@@ -54,12 +63,17 @@ const ProductSkeleton = ({ viewMode }: { viewMode: 'grid' | 'list' }) => (
   </div>
 );
 
-// Product card component
+// Optimized product card with lazy image loading
 const ProductCard = ({ product, viewMode, onAddToCart }: {
   product: Product;
   viewMode: 'grid' | 'list';
   onAddToCart: (product: Product) => void;
 }) => {
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageError, setImageError] = useState(false);
+  const [imageSrc, setImageSrc] = useState<string>('');
+  const containerRef = useRef<HTMLDivElement>(null);
+
   const formatPrice = useCallback((price: number) => {
     return new Intl.NumberFormat('en-UG', {
       style: 'currency',
@@ -117,23 +131,65 @@ const ProductCard = ({ product, viewMode, onAddToCart }: {
 
   const isOutOfStock = product.stock_quantity === 0 && !product.is_preorder;
 
+  // Optimized image loading with intersection observer on container
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container || imageSrc) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const [entry] = entries;
+        if (entry.isIntersecting) {
+          setImageSrc(product.images[0] || '/placeholder.svg');
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.1, rootMargin: '100px' }
+    );
+
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [product.images, imageSrc]);
+
   return (
     <div
-      className={`bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-300 group ${
+      className={`bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-200 group ${
         viewMode === 'list' ? 'flex gap-4 p-4' : 'overflow-hidden'
       }`}
     >
       {/* Product Image */}
-      <div className={`relative ${
-        viewMode === 'list' ? 'w-24 h-24 rounded-lg flex-shrink-0' : 'aspect-square'
-      }`}>
+      <div 
+        ref={containerRef}
+        className={`relative ${
+          viewMode === 'list' ? 'w-24 h-24 rounded-lg flex-shrink-0' : 'aspect-square'
+        }`}
+      >
         <Link to={`/products/${product.slug}`} className="block w-full h-full">
-          <img
-            src={product.images[0] || '/placeholder.svg'}
-            alt={product.name}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-            loading="lazy"
-          />
+          <div className="w-full h-full bg-gray-100 rounded overflow-hidden">
+            {!imageSrc && (
+              <div className="w-full h-full bg-gray-200 animate-pulse flex items-center justify-center">
+                <div className="text-gray-400 text-xs">Loading...</div>
+              </div>
+            )}
+            {imageSrc && (
+              <img
+                src={imageSrc}
+                alt={product.name}
+                className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-200 ${
+                  imageLoaded ? 'opacity-100' : 'opacity-0'
+                }`}
+                onLoad={() => setImageLoaded(true)}
+                onError={() => setImageError(true)}
+                loading="lazy"
+                decoding="async"
+              />
+            )}
+            {imageError && imageSrc && (
+              <div className="w-full h-full bg-gray-200 flex items-center justify-center text-gray-400 text-xs">
+                No Image
+              </div>
+            )}
+          </div>
         </Link>
         
         {/* Badges and Icons */}
@@ -277,12 +333,15 @@ const Products = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [priceRange, setPriceRange] = useState({ min: '', max: '' });
   const [currentPage, setCurrentPage] = useState(1);
   const [totalProducts, setTotalProducts] = useState(0);
   const { addToCart } = useCart();
   const { toast } = useToast();
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Memoized search parameters
   const searchState = useMemo(() => ({
@@ -296,8 +355,31 @@ const Products = () => {
     setCurrentPage(searchState.page);
   }, [searchState.page]);
 
+  // Generate cache key
+  const generateCacheKey = useCallback((params: any) => {
+    return JSON.stringify({
+      ...params,
+      priceMin: priceRange.min,
+      priceMax: priceRange.max,
+      page: currentPage
+    });
+  }, [priceRange, currentPage]);
+
+  // Check if cache is valid
+  const isCacheValid = useCallback((timestamp: number) => {
+    return Date.now() - timestamp < CACHE_DURATION;
+  }, []);
+
   const fetchCategories = useCallback(async () => {
+    // Check cache first
+    if (cache.categories && isCacheValid(cache.categoriesTimestamp)) {
+      setCategories(cache.categories);
+      setCategoriesLoading(false);
+      return;
+    }
+
     try {
+      setCategoriesLoading(true);
       const { data, error } = await supabase
         .from('categories')
         .select('id, name, slug')
@@ -307,6 +389,11 @@ const Products = () => {
       if (error) throw error;
       
       const allCategories = [{ id: 'all', name: 'All Categories', slug: 'all' }, ...(data || [])];
+      
+      // Update cache
+      cache.categories = allCategories;
+      cache.categoriesTimestamp = Date.now();
+      
       setCategories(allCategories);
     } catch (error) {
       console.error('Error fetching categories:', error);
@@ -315,111 +402,185 @@ const Products = () => {
         description: "Failed to load categories",
         variant: "destructive",
       });
+    } finally {
+      setCategoriesLoading(false);
     }
-  }, [toast]);
+  }, [toast, isCacheValid]);
 
   const fetchProducts = useCallback(async () => {
-    try {
-      setLoading(true);
-      
-      let query = supabase
-        .from('products')
-        .select(`
-          id,
-          name,
-          price,
-          original_price,
-          description,
-          short_description,
-          images,
-          stock_quantity,
-          rating,
-          reviews_count,
-          slug,
-          sku,
-          view_count,
-          is_preorder,
-          preorder_availability_date,
-          condition,
-          categories!inner(name, slug)
-        `, { count: 'exact' })
-        .eq('is_active', true);
-
-      if (searchState.category && searchState.category !== 'all') {
-        query = query.eq('categories.slug', searchState.category);
-      }
-      if (searchState.searchQuery) {
-        query = query.ilike('name', `%${searchState.searchQuery}%`);
-      }
-
-      if (priceRange.min) {
-        query = query.gte('price', parseInt(priceRange.min));
-      }
-      if (priceRange.max) {
-        query = query.lte('price', parseInt(priceRange.max));
-      }
-
-      // Apply sorting
-      switch (searchState.sortBy) {
-        case 'price-low':
-          query = query.order('price', { ascending: true });
-          break;
-        case 'price-high':
-          query = query.order('price', { ascending: false });
-          break;
-        case 'rating':
-          query = query.order('rating', { ascending: false });
-          break;
-        case 'popular':
-          query = query.order('view_count', { ascending: false });
-          break;
-        case 'newest':
-        default:
-          query = query.order('created_at', { ascending: false });
-          break;
-      }
-
-      const from = (currentPage - 1) * PRODUCTS_PER_PAGE;
-      const to = from + PRODUCTS_PER_PAGE - 1;
-      query = query.range(from, to);
-
-      const { data, error, count } = await query;
-
-      if (error) throw error;
-
-      const transformedProducts = data?.map((product: any) => ({
-        id: product.id,
-        name: product.name,
-        price: product.price,
-        original_price: product.original_price,
-        description: product.description || product.short_description || '',
-        short_description: product.short_description,
-        images: product.images || [],
-        category: product.categories?.slug || '',
-        stock_quantity: product.stock_quantity || 0,
-        rating: product.rating || 4.0,
-        reviews_count: product.reviews_count || 0,
-        slug: product.slug,
-        sku: product.sku,
-        view_count: product.view_count || 0,
-        is_preorder: product.is_preorder || false,
-        preorder_availability_date: product.preorder_availability_date,
-        condition: product.condition,
-      })) || [];
-
-      setProducts(transformedProducts);
-      setTotalProducts(count || 0);
-    } catch (error) {
-      console.error('Error fetching products:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load products",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
+    // Cancel previous request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
     }
-  }, [searchState, priceRange, currentPage, toast]);
+
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
+    // Clear search timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    // Debounce search for better performance
+    if (searchState.searchQuery) {
+      searchTimeoutRef.current = setTimeout(() => {
+        performFetch();
+      }, 300);
+      return;
+    }
+
+    performFetch();
+
+    async function performFetch() {
+      try {
+        // Check cache first
+        const cacheKey = generateCacheKey(searchState);
+        const cachedData = cache.products.get(cacheKey);
+        
+        if (cachedData && isCacheValid(cachedData.timestamp)) {
+          setProducts(cachedData.data);
+          setTotalProducts(cachedData.count);
+          setLoading(false);
+          return;
+        }
+
+        setLoading(true);
+        
+        // Optimized query - select only needed fields
+        let query = supabase
+          .from('products')
+          .select(`
+            id,
+            name,
+            price,
+            original_price,
+            short_description,
+            images,
+            stock_quantity,
+            rating,
+            reviews_count,
+            slug,
+            view_count,
+            is_preorder,
+            preorder_availability_date,
+            condition,
+            categories!inner(slug)
+          `, { count: 'exact' })
+          .eq('is_active', true);
+
+        if (searchState.category && searchState.category !== 'all') {
+          query = query.eq('categories.slug', searchState.category);
+        }
+        if (searchState.searchQuery) {
+          query = query.ilike('name', `%${searchState.searchQuery}%`);
+        }
+
+        if (priceRange.min) {
+          query = query.gte('price', parseInt(priceRange.min));
+        }
+        if (priceRange.max) {
+          query = query.lte('price', parseInt(priceRange.max));
+        }
+
+        // Apply sorting
+        switch (searchState.sortBy) {
+          case 'price-low':
+            query = query.order('price', { ascending: true });
+            break;
+          case 'price-high':
+            query = query.order('price', { ascending: false });
+            break;
+          case 'rating':
+            query = query.order('rating', { ascending: false });
+            break;
+          case 'popular':
+            query = query.order('view_count', { ascending: false });
+            break;
+          case 'newest':
+          default:
+            query = query.order('created_at', { ascending: false });
+            break;
+        }
+
+        // Get total count first for validation
+        const { count: totalCount } = await query.abortSignal(abortController.signal);
+        const totalAvailable = totalCount || 0;
+        const maxPage = Math.max(1, Math.ceil(totalAvailable / PRODUCTS_PER_PAGE));
+        
+        // Ensure currentPage doesn't exceed available pages
+        const validPage = Math.min(currentPage, maxPage);
+        
+        // If the current page is invalid, update it
+        if (validPage !== currentPage) {
+          setCurrentPage(validPage);
+          const params = new URLSearchParams(searchParams);
+          params.set('page', validPage.toString());
+          setSearchParams(params);
+          return;
+        }
+
+        const from = (validPage - 1) * PRODUCTS_PER_PAGE;
+        const to = from + PRODUCTS_PER_PAGE - 1;
+        
+        // Only apply range if there are products to fetch
+        if (totalAvailable > 0) {
+          query = query.range(from, to);
+        }
+
+        const { data, error } = await query.abortSignal(abortController.signal);
+
+        if (error) {
+          if (error.name === 'AbortError') return;
+          throw error;
+        }
+
+        const transformedProducts = data?.map((product: any) => ({
+          id: product.id,
+          name: product.name,
+          price: product.price,
+          original_price: product.original_price,
+          description: product.short_description || '',
+          short_description: product.short_description,
+          images: product.images || [],
+          category: product.categories?.slug || '',
+          stock_quantity: product.stock_quantity || 0,
+          rating: product.rating || 4.0,
+          reviews_count: product.reviews_count || 0,
+          slug: product.slug,
+          view_count: product.view_count || 0,
+          is_preorder: product.is_preorder || false,
+          preorder_availability_date: product.preorder_availability_date,
+          condition: product.condition,
+        })) || [];
+
+        // Update cache
+        cache.products.set(cacheKey, {
+          data: transformedProducts,
+          count: totalAvailable,
+          timestamp: Date.now()
+        });
+
+        // Limit cache size (keep last 20 entries)
+        if (cache.products.size > 20) {
+          const firstKey = cache.products.keys().next().value;
+          cache.products.delete(firstKey);
+        }
+
+        setProducts(transformedProducts);
+        setTotalProducts(totalAvailable);
+      } catch (error: any) {
+        if (error.name === 'AbortError') return;
+        console.error('Error fetching products:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load products",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    }
+  }, [searchState, priceRange, currentPage, toast, searchParams, setSearchParams, generateCacheKey, isCacheValid]);
 
   useEffect(() => {
     fetchCategories();
@@ -427,6 +588,16 @@ const Products = () => {
 
   useEffect(() => {
     fetchProducts();
+    
+    // Cleanup on unmount
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
   }, [fetchProducts]);
 
   const handleAddToCart = useCallback((product: Product) => {
@@ -452,6 +623,7 @@ const Products = () => {
     const params = new URLSearchParams(searchParams);
     params.set('page', newPage.toString());
     setSearchParams(params);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [searchParams, setSearchParams]);
 
   const handleSearchParamChange = useCallback((key: string, value: string | null) => {
@@ -461,7 +633,7 @@ const Products = () => {
     } else {
       params.delete(key);
     }
-    params.delete('page'); // Reset to first page when filters change
+    params.delete('page');
     setSearchParams(params);
   }, [searchParams, setSearchParams]);
 
@@ -555,16 +727,16 @@ const Products = () => {
     return items;
   }, [totalPages, currentPage, handlePageChange]);
 
-  if (loading) {
+  if (loading && products.length === 0) {
     return (
       <div className="min-h-screen bg-gray-50">
         <div className="container mx-auto px-4 py-6">
           <div className={
             viewMode === 'grid' 
-              ? "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4" 
+              ? "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4" 
               : "space-y-4"
           }>
-            {[...Array(8)].map((_, i) => (
+            {[...Array(12)].map((_, i) => (
               <ProductSkeleton key={i} viewMode={viewMode} />
             ))}
           </div>
@@ -583,6 +755,7 @@ const Products = () => {
           </h1>
           <p className="text-sm text-gray-600">
             {totalProducts} product{totalProducts !== 1 ? 's' : ''} found
+            {loading && products.length > 0 && <span className="ml-2 text-blue-600">Updating...</span>}
           </p>
         </div>
       </div>
@@ -593,21 +766,25 @@ const Products = () => {
           <div className="lg:w-64 space-y-4">
             <div className="bg-white rounded-xl p-4 shadow-sm">
               <h3 className="font-semibold text-gray-900 mb-3 text-sm">CATEGORY</h3>
-              <Select
-                value={searchState.category}
-                onValueChange={(value) => handleSearchParamChange('category', value)}
-              >
-                <SelectTrigger className="text-sm">
-                  <SelectValue placeholder="Select category" />
-                </SelectTrigger>
-                <SelectContent>
-                  {categories.map((cat) => (
-                    <SelectItem key={cat.id} value={cat.slug}>
-                      {cat.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {categoriesLoading ? (
+                <div className="h-10 bg-gray-200 rounded animate-pulse"></div>
+              ) : (
+                <Select
+                  value={searchState.category}
+                  onValueChange={(value) => handleSearchParamChange('category', value)}
+                >
+                  <SelectTrigger className="text-sm">
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((cat) => (
+                      <SelectItem key={cat.id} value={cat.slug}>
+                        {cat.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
 
             <div className="bg-white rounded-xl p-4 shadow-sm">
@@ -676,7 +853,7 @@ const Products = () => {
             {/* Products Grid/List */}
             <div className={
               viewMode === 'grid' 
-                ? "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4" 
+                ? "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4" 
                 : "space-y-4"
             }>
               {products.map((product) => (
@@ -688,6 +865,16 @@ const Products = () => {
                 />
               ))}
             </div>
+
+            {/* Loading indicator for pagination */}
+            {loading && products.length > 0 && (
+              <div className="mt-8 text-center">
+                <div className="inline-flex items-center gap-2 text-blue-600">
+                  <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                  Loading more products...
+                </div>
+              </div>
+            )}
 
             {/* Pagination */}
             {totalPages > 1 && (

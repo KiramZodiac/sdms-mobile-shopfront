@@ -67,7 +67,7 @@ export const FeaturedProducts = () => {
         `)
         .eq("is_active", true)
         .eq("is_featured", true)
-        .limit(12)
+        .limit(18)
         .order("created_at", { ascending: false });
 
       // Data loaded successfully

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, Suspense, lazy } from 'react';
+import { useState, useEffect, useCallback, useMemo, Suspense, lazy, memo, startTransition } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Star, ShoppingCart, ArrowLeft, Share2, Eye, Phone, Zap, ImageIcon, VideoIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -8,11 +8,17 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useCart } from '@/hooks/useCart';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { memo } from 'react';
-import { SpecificationsCard } from './SpecificationsCard';
 
-// Lazy-load SpecificationsCard
+// Lazy load heavy components with preload
+const SpecificationsCard = lazy(() => 
+  import('./SpecificationsCard').then(module => ({ default: module.SpecificationsCard }))
+);
 
+// Preload SpecificationsCard on user interaction
+const preloadSpecifications = () => {
+  const componentImport = () => import('./SpecificationsCard');
+  componentImport();
+};
 interface Product {
   id: string;
   name: string;
@@ -36,64 +42,146 @@ interface Product {
   categories?: {
     name: string;
     slug: string;
-  };
+  }
 }
 
-// Define MediaItem type explicitly
 interface MediaItem {
   type: 'image' | 'video';
   src: string;
   alt: string;
 }
 
-// Media thumbnail component
-const MediaThumbnail = memo(
-  ({ type, src, alt, isSelected, onClick }: {
-    type: 'image' | 'video';
-    src: string;
-    alt: string;
-    isSelected: boolean;
-    onClick: () => void;
-  }) => (
+// Optimized image component with lazy loading and blur placeholder
+const OptimizedImage = memo(({ 
+  src, 
+  alt, 
+  className, 
+  onLoad, 
+  onError,
+  sizes,
+  priority = false 
+}: {
+  src: string;
+  alt: string;
+  className?: string;
+  onLoad?: () => void;
+  onError?: () => void;
+  sizes?: string;
+  priority?: boolean;
+}) => {
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [hasError, setHasError] = useState(false);
+
+  const handleLoad = useCallback(() => {
+    setIsLoaded(true);
+    onLoad?.();
+  }, [onLoad]);
+
+  const handleError = useCallback(() => {
+    setHasError(true);
+    onError?.();
+  }, [onError]);
+
+  return (
+    <div className={`relative overflow-hidden ${className}`}>
+      {!isLoaded && !hasError && (
+        <div className="absolute inset-0 bg-gray-200 animate-pulse" />
+      )}
+      <img
+        src={hasError ? '/placeholder.svg' : src}
+        alt={alt}
+        className={`transition-opacity duration-300 ${isLoaded ? 'opacity-100' : 'opacity-0'} ${className}`}
+        onLoad={handleLoad}
+        onError={handleError}
+        loading={priority ? 'eager' : 'lazy'}
+        decoding="async"
+        sizes={sizes}
+      />
+    </div>
+  );
+});
+
+// Media thumbnail component with intersection observer
+const MediaThumbnail = memo(({ 
+  type, 
+  src, 
+  alt, 
+  isSelected, 
+  onClick,
+  index 
+}: {
+  type: 'image' | 'video';
+  src: string;
+  alt: string;
+  isSelected: boolean;
+  onClick: () => void;
+  index: number;
+}) => {
+  const [isVisible, setIsVisible] = useState(index < 4); // Load first 4 immediately
+
+  useEffect(() => {
+    if (isVisible || index < 4) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsVisible(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '50px' }
+    );
+
+    const element = document.querySelector(`[data-thumbnail="${index}"]`);
+    if (element) observer.observe(element);
+
+    return () => observer.disconnect();
+  }, [index, isVisible]);
+
+  return (
     <button
+      data-thumbnail={index}
       onClick={onClick}
       className={`relative aspect-square overflow-hidden rounded border-2 transition-all duration-200 hover:opacity-80 ${
         isSelected ? 'border-blue-600 ring-2 ring-blue-200' : 'border-gray-200 hover:border-gray-300'
       }`}
       aria-label={`View ${type}: ${alt}`}
     >
-      {type === 'video' ? (
-        <>
-          <video
-            src={src}
-            className="w-full h-full object-cover"
-            preload="metadata"
-            muted
-            aria-hidden="true"
-          />
-          <div className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center">
-            <VideoIcon className="w-6 h-6 text-white" />
-          </div>
-        </>
+      {isVisible ? (
+        type === 'video' ? (
+          <>
+            <video
+              src={src}
+              className="w-full h-full object-cover"
+              preload="none"
+              muted
+              aria-hidden="true"
+            />
+            <div className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center">
+              <VideoIcon className="w-6 h-6 text-white" />
+            </div>
+          </>
+        ) : (
+          <>
+            <OptimizedImage
+              src={src}
+              alt={alt}
+              className="w-full h-full object-cover"
+              sizes="(max-width: 640px) 25vw, 15vw"
+            />
+            <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-10 transition-all duration-200 flex items-center justify-center">
+              <ImageIcon className="w-6 h-6 text-white opacity-0 hover:opacity-100 transition-opacity duration-200" />
+            </div>
+          </>
+        )
       ) : (
-        <>
-          <img
-            src={src}
-            alt={alt}
-            className="w-full h-full object-cover"
-            loading="lazy"
-            sizes="(max-width: 640px) 25vw, 15vw"
-          />
-          <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-10 transition-all duration-200 flex items-center justify-center">
-            <ImageIcon className="w-6 h-6 text-white opacity-0 hover:opacity-100 transition-opacity duration-200" />
-          </div>
-        </>
+        <div className="w-full h-full bg-gray-200 animate-pulse" />
       )}
     </button>
-  )
-);
+  );
+});
 
-// Stock status component
+// Memoized stock status component
 const StockStatus = memo(({ product }: { product: Product }) => {
   const stockInfo = useMemo(() => {
     if (product.is_preorder) {
@@ -103,7 +191,6 @@ const StockStatus = memo(({ product }: { product: Product }) => {
           ? `Pre-order - Available ${new Date(product.preorder_availability_date).toLocaleDateString('en-UG', { month: 'short', day: 'numeric', year: 'numeric' })}`
           : 'Pre-order Available',
         className: 'text-blue-600',
-        bgColor: 'bg-blue-500',
       };
     }
 
@@ -112,7 +199,6 @@ const StockStatus = memo(({ product }: { product: Product }) => {
         icon: <div className="w-3 h-3 bg-green-500 rounded-full" />,
         text: product.stock_quantity < 10 ? `Only ${product.stock_quantity} left!` : 'In Stock',
         className: 'text-green-600',
-        bgColor: 'bg-green-500',
       };
     }
 
@@ -120,7 +206,6 @@ const StockStatus = memo(({ product }: { product: Product }) => {
       icon: <div className="w-3 h-3 bg-red-500 rounded-full" />,
       text: 'Out of Stock',
       className: 'text-red-600',
-      bgColor: 'bg-red-500',
     };
   }, [product.stock_quantity, product.is_preorder, product.preorder_availability_date]);
 
@@ -132,52 +217,50 @@ const StockStatus = memo(({ product }: { product: Product }) => {
   );
 });
 
-// Rating component
-const RatingDisplay = memo(
-  ({ rating, reviewsCount }: { rating: number; reviewsCount: number }) => (
-    <div className="flex items-center gap-2">
-      <div className="flex" role="img" aria-label={`Rating: ${rating} out of 5 stars`}>
-        {[...Array(5)].map((_, i) => (
-          <Star
-            key={i}
-            className={`w-5 h-5 ${i < Math.floor(rating) ? 'text-yellow-400 fill-current' : 'text-gray-300'}`}
-          />
-        ))}
-      </div>
-      <span className="text-sm text-gray-600">
-        {rating.toFixed(1)} ({reviewsCount} review{reviewsCount !== 1 ? 's' : ''})
-      </span>
+// Memoized rating component
+const RatingDisplay = memo(({ rating, reviewsCount }: { rating: number; reviewsCount: number }) => (
+  <div className="flex items-center gap-2">
+    <div className="flex" role="img" aria-label={`Rating: ${rating} out of 5 stars`}>
+      {[...Array(5)].map((_, i) => (
+        <Star
+          key={i}
+          className={`w-5 h-5 ${i < Math.floor(rating) ? 'text-yellow-400 fill-current' : 'text-gray-300'}`}
+        />
+      ))}
     </div>
-  )
-);
+    <span className="text-sm text-gray-600">
+      {rating.toFixed(1)} ({reviewsCount} review{reviewsCount !== 1 ? 's' : ''})
+    </span>
+  </div>
+));
 
-// Loading skeleton component
-const ProductSkeleton = () => (
+// Optimized loading skeleton
+const ProductSkeleton = memo(() => (
   <div className="container mx-auto px-4 py-8">
-    <Skeleton className="h-10 w-24 mb-6" />
+    <div className="h-10 w-24 mb-6 bg-gray-200 rounded animate-pulse" />
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
       <div className="space-y-4">
-        <Skeleton className="aspect-square rounded-lg" />
+        <div className="aspect-square rounded-lg bg-gray-200 animate-pulse" />
         <div className="grid grid-cols-4 gap-2">
           {[...Array(4)].map((_, i) => (
-            <Skeleton key={i} className="aspect-square rounded" />
+            <div key={i} className="aspect-square rounded bg-gray-200 animate-pulse" />
           ))}
         </div>
       </div>
       <div className="space-y-4">
-        <Skeleton className="h-8 w-3/4" />
-        <Skeleton className="h-4 w-1/2" />
-        <Skeleton className="h-6 w-1/4" />
-        <Skeleton className="h-20 w-full" />
+        <div className="h-8 w-3/4 bg-gray-200 rounded animate-pulse" />
+        <div className="h-4 w-1/2 bg-gray-200 rounded animate-pulse" />
+        <div className="h-6 w-1/4 bg-gray-200 rounded animate-pulse" />
+        <div className="h-20 w-full bg-gray-200 rounded animate-pulse" />
         <div className="flex gap-4">
-          <Skeleton className="h-12 flex-1" />
-          <Skeleton className="h-12 w-12" />
-          <Skeleton className="h-12 w-12" />
+          <div className="h-12 flex-1 bg-gray-200 rounded animate-pulse" />
+          <div className="h-12 w-12 bg-gray-200 rounded animate-pulse" />
+          <div className="h-12 w-12 bg-gray-200 rounded animate-pulse" />
         </div>
       </div>
     </div>
   </div>
-);
+));
 
 export default function ProductDetail() {
   const { slug } = useParams<{ slug: string }>();
@@ -189,18 +272,25 @@ export default function ProductDetail() {
   const { addToCart } = useCart();
   const { toast } = useToast();
 
-  // Format functions
-  const formatPrice = useCallback(
-    (price: number) =>
-      new Intl.NumberFormat('en-UG', { style: 'currency', currency: 'UGX', minimumFractionDigits: 0 }).format(price),
+  // Optimized format functions with memoization
+  const formatPrice = useMemo(
+    () => (price: number) =>
+      new Intl.NumberFormat('en-UG', { 
+        style: 'currency', 
+        currency: 'UGX', 
+        minimumFractionDigits: 0 
+      }).format(price),
     []
   );
 
-  const formatViewCount = useCallback((count: number) => {
-    if (count >= 1000000) return `${(count / 1000000).toFixed(1)}M`;
-    if (count >= 1000) return `${(count / 1000).toFixed(1)}k`;
-    return count.toString();
-  }, []);
+  const formatViewCount = useMemo(
+    () => (count: number) => {
+      if (count >= 1000000) return `${(count / 1000000).toFixed(1)}M`;
+      if (count >= 1000) return `${(count / 1000).toFixed(1)}k`;
+      return count.toString();
+    },
+    []
+  );
 
   // Memoized calculations
   const discountPercentage = useMemo(
@@ -218,93 +308,122 @@ export default function ProductDetail() {
       items.push({ type: 'image', src: image, alt: `${product.name} image ${index + 1}` })
     );
     return items;
-  }, [product]);
+  }, [product?.video_url, product?.images, product?.name]);
 
+  // Debounced view count increment
   const incrementViewCount = useCallback(async (productId: string) => {
     const viewedKey = `viewed-${productId}`;
     if (sessionStorage.getItem(viewedKey)) return;
 
     try {
-      const { error } = await supabase.rpc('increment_product_view', { product_id: productId });
-      if (error) throw error;
-      sessionStorage.setItem(viewedKey, 'true');
-      setProduct((prev) => (prev ? { ...prev, view_count: (prev.view_count || 0) + 1 } : null));
+      // Use startTransition for non-urgent update
+      startTransition(() => {
+        supabase.rpc('increment_product_view', { product_id: productId }).then(({ error }) => {
+          if (!error) {
+            sessionStorage.setItem(viewedKey, 'true');
+            setProduct((prev) => (prev ? { ...prev, view_count: (prev.view_count || 0) + 1 } : null));
+          }
+        });
+      });
     } catch (error) {
       console.error('Failed to increment view count:', error);
     }
   }, []);
 
-  const fetchProduct = useCallback(
-    async (productSlug: string) => {
-      const cacheKey = `product-${productSlug}`;
-      const cacheTimeKey = `product-${productSlug}-time`;
-      const cacheDuration = 1000 * 60 * 10; // 10 minutes
+  // Optimized fetch with better caching strategy
+  const fetchProduct = useCallback(async (productSlug: string) => {
+    const cacheKey = `product-${productSlug}`;
+    const cacheTimeKey = `product-${productSlug}-time`;
+    const cacheDuration = 1000 * 60 * 5; // Reduced to 5 minutes for fresher data
 
-      const cachedData = localStorage.getItem(cacheKey);
-      const cacheTime = localStorage.getItem(cacheTimeKey);
+    // Check cache first
+    const cachedData = localStorage.getItem(cacheKey);
+    const cacheTime = localStorage.getItem(cacheTimeKey);
 
-      if (cachedData && cacheTime && Date.now() - parseInt(cacheTime) < cacheDuration) {
-        setProduct(JSON.parse(cachedData));
-        setLoading(false);
-        return;
-      }
+    if (cachedData && cacheTime && Date.now() - parseInt(cacheTime) < cacheDuration) {
+      const parsedData = JSON.parse(cachedData);
+      setProduct(parsedData);
+      setLoading(false);
+      incrementViewCount(parsedData.id);
+      return;
+    }
 
-      try {
-        setLoading(true);
-        const { data, error } = await supabase
-          .from('products')
-          .select(`
-            *,
-            categories(name, slug)
-          `)
-          .eq('slug', productSlug)
-          .eq('is_active', true)
-          .single();
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('products')
+        .select(`
+          id, name, price, original_price, description, short_description,
+          images, video_url, features, specifications, stock_quantity,
+          rating, reviews_count, slug, sku, view_count, is_preorder,
+          preorder_availability_date, condition,
+          categories!inner(name, slug)
+        `)
+        .eq('slug', productSlug)
+        .eq('is_active', true)
+        .single();
 
-        if (error) throw error;
+      if (error) throw error;
 
-        if (data) {
-          const productData: Product = {
-            ...data,
-            specifications: typeof data.specifications === 'string' ? JSON.parse(data.specifications) : data.specifications,
-            rating: data.rating || 4.0,
-            reviews_count: data.reviews_count || 0,
-            view_count: data.view_count || 0,
-            images: data.images || [],
-            is_preorder: data.is_preorder || false,
-          };
+      if (data) {
+        const productData: Product = {
+          ...data,
+          specifications: typeof data.specifications === 'string' 
+            ? JSON.parse(data.specifications) 
+            : data.specifications,
+          rating: data.rating || 4.0,
+          reviews_count: data.reviews_count || 0,
+          view_count: data.view_count || 0,
+          images: data.images || [],
+          is_preorder: data.is_preorder || false,
+          categories: data.categories[0] || { name: '', slug: '' },
+        };
 
-          setProduct(productData);
+        setProduct(productData);
+        
+        // Cache the data
+        try {
           localStorage.setItem(cacheKey, JSON.stringify(productData));
           localStorage.setItem(cacheTimeKey, Date.now().toString());
-          await incrementViewCount(data.id);
+        } catch (e) {
+          // Handle localStorage errors silently
         }
-      } catch (error) {
-        console.error('Error fetching product:', error);
-        toast({
-          title: 'Error',
-          description: 'Product not found',
-          variant: 'destructive',
-        });
-        navigate('/products');
-      } finally {
-        setLoading(false);
+        
+        incrementViewCount(data.id);
       }
-    },
-    [incrementViewCount, toast, navigate]
-  );
+    } catch (error) {
+      console.error('Error fetching product:', error);
+      toast({
+        title: 'Error',
+        description: 'Product not found',
+        variant: 'destructive',
+      });
+      navigate('/products');
+    } finally {
+      setLoading(false);
+    }
+  }, [incrementViewCount, toast, navigate]);
 
   useEffect(() => {
     if (slug) fetchProduct(slug);
   }, [slug, fetchProduct]);
 
   useEffect(() => {
-    if (product) setSelectedMedia(product.video_url ? 'video' : 0);
+    if (product) {
+      setSelectedMedia(product.video_url ? 'video' : 0);
+      // Preload specifications component on mount
+      preloadSpecifications();
+    }
   }, [product]);
 
   const handleAddToCart = useCallback(() => {
     if (!product) return;
-    addToCart({ id: product.id, name: product.name, price: product.price, images: product.images });
+    addToCart({ 
+      id: product.id, 
+      name: product.name, 
+      price: product.price, 
+      images: product.images 
+    });
     toast({
       title: product.is_preorder ? 'Pre-ordered' : 'Added to Cart',
       description: product.is_preorder
@@ -315,6 +434,7 @@ export default function ProductDetail() {
 
   const handleShare = useCallback(async () => {
     if (!product) return;
+    
     if (navigator.share) {
       try {
         await navigator.share({
@@ -323,9 +443,7 @@ export default function ProductDetail() {
           url: window.location.href,
         });
       } catch (error) {
-        if (import.meta.env.DEV) {
-          console.log('Error sharing:', error);
-        }
+        // Silently handle share cancellation
       }
     } else {
       try {
@@ -345,8 +463,10 @@ export default function ProductDetail() {
   }, [product, toast]);
 
   const handleMediaSelect = useCallback((index: number | 'video') => {
-    setSelectedMedia(index);
-    setImageLoading(true);
+    startTransition(() => {
+      setSelectedMedia(index);
+      setImageLoading(true);
+    });
   }, []);
 
   if (loading) return <ProductSkeleton />;
@@ -396,7 +516,6 @@ export default function ProductDetail() {
             {currentMedia.type === 'video' ? (
               <video
                 controls
-                autoPlay
                 loop
                 muted
                 className="w-full h-full object-cover"
@@ -408,13 +527,14 @@ export default function ProductDetail() {
                 Your browser does not support the video tag.
               </video>
             ) : (
-              <img
+              <OptimizedImage
                 src={currentMedia.src}
                 alt={currentMedia.alt}
                 className="w-full h-full object-cover"
                 onLoad={() => setImageLoading(false)}
                 onError={() => setImageLoading(false)}
                 sizes="(max-width: 1024px) 100vw, 50vw"
+                priority={true}
               />
             )}
             <div className="absolute top-4 right-4">
@@ -444,6 +564,7 @@ export default function ProductDetail() {
                 type={media.type}
                 src={media.src}
                 alt={media.alt}
+                index={index}
                 isSelected={
                   media.type === 'video' ? selectedMedia === 'video' : selectedMedia === (product.video_url ? index - 1 : index)
                 }
@@ -482,7 +603,9 @@ export default function ProductDetail() {
             </h1>
             {product.sku && <p className="text-sm text-gray-500">SKU: {product.sku}</p>}
           </div>
+          
           <RatingDisplay rating={product.rating || 4.0} reviewsCount={product.reviews_count || 0} />
+          
           <div className="space-y-2">
             <div className="flex items-center gap-4 flex-wrap">
               <span className="text-3xl font-bold text-blue-600">{formatPrice(product.price)}</span>
@@ -494,11 +617,14 @@ export default function ProductDetail() {
               )}
             </div>
           </div>
+          
           <StockStatus product={product} />
+          
           <div>
             <h3 className="text-lg font-semibold mb-2">Description</h3>
             <p className="text-gray-600 leading-relaxed">{product.description || product.short_description}</p>
           </div>
+          
           {product.features && product.features.length > 0 && (
             <div>
               <h3 className="text-lg font-semibold mb-2">Features</h3>
@@ -509,6 +635,7 @@ export default function ProductDetail() {
               </ul>
             </div>
           )}
+          
           <div className="flex gap-4">
             <Button
               onClick={handleAddToCart}
@@ -542,8 +669,9 @@ export default function ProductDetail() {
           </div>
         </div>
       </div>
+      
       {product.specifications && Object.keys(product.specifications).length > 0 && (
-        <Suspense fallback={<Skeleton className="mt-8 h-40 w-full" />}>
+        <Suspense fallback={<div className="mt-8 h-40 w-full bg-gray-200 rounded animate-pulse" />}>
           <SpecificationsCard specifications={product.specifications} />
         </Suspense>
       )}
