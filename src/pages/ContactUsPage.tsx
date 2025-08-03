@@ -45,8 +45,8 @@ const ContactUsPage = () => {
                     <div>
                       <h3 className="text-xl font-semibold text-gray-800 mb-2">Email</h3>
                       <p className="text-gray-600">Send us your questions anytime</p>
-                      <a href="mailto:info@sdmelectronics.ug" className="text-orange-600 hover:text-orange-700 font-medium">
-                        info@sdmelectronics.ug
+                      <a href="mailto:sdmelectromics256@gmail.com" className="text-orange-600 hover:text-orange-700 font-medium">
+                        sdmelectromics256@gmail.com
                       </a>
                     </div>
                   </div>

@@ -96,7 +96,7 @@ export const Navbar = () => {
               
               <div className="flex flex-col justify-center">
                 <span className="text-sm sm:text-lg lg:text-xl font-bold text-white leading-tight">
-                  SDM Electronics
+                  SDM ELECTRONICS
                 </span>
                 <span className="text-xs lg:text-sm text-white/80 leading-tight hidden sm:block">
                   Quality Electronics
