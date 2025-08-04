@@ -96,7 +96,7 @@ const Checkout = () => {
           payment_method: 'whatsapp',
           status: 'pending',
           notes: customerData.notes || null,
-          address: customerData.address || null,
+          
         }])
         .select()
         .single();
