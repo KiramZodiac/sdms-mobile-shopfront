@@ -192,10 +192,7 @@ export const PromoBannerList: React.FC = () => {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button onClick={refresh} variant="outline" size="sm">
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Refresh
-          </Button>
+       
           <Button onClick={() => setShowForm(true)}>
             <Plus className="w-4 h-4 mr-2" />
             Add Banner

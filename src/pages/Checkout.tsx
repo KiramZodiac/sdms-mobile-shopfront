@@ -10,7 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
 const Checkout = () => {
-  const { items, total, clearCart } = useCart();
+  const { items, total, clearCart, addToRecentProducts } = useCart();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [customerData, setCustomerData] = useState({
@@ -152,6 +152,9 @@ ${customerData.notes ? `Notes: ${customerData.notes}` : ''}`;
         .update({ whatsapp_chat_url: whatsappUrl })
         .eq('id', order.id);
 
+      // Add purchased items to recent products
+      addToRecentProducts(items);
+      
       clearCart();
       window.open(whatsappUrl, '_blank');
 

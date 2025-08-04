@@ -819,13 +819,33 @@ const Admin = () => {
         </div>
 
         <Tabs defaultValue="products" className="space-y-3 sm:space-y-4">
-          <TabsList className="grid w-full grid-cols-6 h-8 sm:h-10">
-            <TabsTrigger value="products" className="text-xs sm:text-sm">Products</TabsTrigger>
-            <TabsTrigger value="categories" className="text-xs sm:text-sm">Categories</TabsTrigger>
-            <TabsTrigger value="banners" className="text-xs sm:text-sm">Banners</TabsTrigger>
-            <TabsTrigger value="promo-banners" className="text-xs sm:text-sm">Promo Banners</TabsTrigger>
-            <TabsTrigger value="carousel" className="text-xs sm:text-sm">Shop Images</TabsTrigger>
-            <TabsTrigger value="marquee" className="text-xs sm:text-sm">Marquee</TabsTrigger>
+          <TabsList
+            className="
+              flex flex-wrap w-full gap-1 sm:gap-0
+              h-auto sm:h-10
+              justify-start sm:grid sm:grid-cols-6
+              bg-transparent
+              p-0
+            "
+          >
+            <TabsTrigger value="products" className="flex-1 min-w-[120px] text-xs sm:text-sm h-8 sm:h-10">
+              Products
+            </TabsTrigger>
+            <TabsTrigger value="categories" className="flex-1 min-w-[120px] text-xs sm:text-sm h-8 sm:h-10">
+              Categories
+            </TabsTrigger>
+            <TabsTrigger value="banners" className="flex-1 min-w-[120px] text-xs sm:text-sm h-8 sm:h-10">
+              Top Banners
+            </TabsTrigger>
+            <TabsTrigger value="promo-banners" className="flex-1 min-w-[120px] text-xs sm:text-sm h-8 sm:h-10">
+              Promo Banners
+            </TabsTrigger>
+            <TabsTrigger value="carousel" className="flex-1 min-w-[120px] text-xs sm:text-sm h-8 sm:h-10">
+              Shop Images
+            </TabsTrigger>
+            <TabsTrigger value="marquee" className="flex-1 min-w-[120px] text-xs sm:text-sm h-8 sm:h-10">
+              Marquee
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="products" className="space-y-3 sm:space-y-4">

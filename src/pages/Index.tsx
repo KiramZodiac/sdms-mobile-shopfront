@@ -2,6 +2,7 @@ import { HeroBanner } from "@/components/HeroBanner";
 import { FeaturedCategories } from "@/components/FeaturedCategories";
 import { FeaturedProducts } from "@/components/FeaturedProducts";
 import PromoBanners from "@/components/PromoBanners";
+import RecentProducts from "@/components/RecentProducts";
 
 import { Mail } from "lucide-react";
 import ShopImageCarousel from "@/components/ShopImageCarousek";
@@ -29,7 +30,8 @@ const Index = () => {
         <FeaturedProducts />
       </section>
 
-    
+      {/* Recently Purchased Products */}
+      <RecentProducts />
 
       {/* Image Carousel */}
       <section className="py-12 container mx-auto px-4">
