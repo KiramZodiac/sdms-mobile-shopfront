@@ -37,7 +37,7 @@ export const FeaturedCategories = () => {
       try {
         const { data, error } = await supabase
           .from("categories")
-          .select("id, name, image_url, is_active, count");
+          .select("id, name, slug, image_url, is_active, count");
 
         if (error) throw error;
 
@@ -74,8 +74,11 @@ export const FeaturedCategories = () => {
             return (
               <Link
                 key={category.id}
-                to={`/products?category=${category.name.toLowerCase()}`}
+                to={`/products?category=${encodeURIComponent(category.slug || category.name)}`}
                 className="flex-shrink-0 flex flex-col items-center group"
+                onClick={() => {
+                  window.scrollTo(0, 0);
+                }}
               >
                 {/* Icon container with circular background */}
                 <div className="w-16 h-16 md:w-24 md:h-24 lg:w-28 lg:h-28 bg-white rounded-2xl shadow-sm border border-gray-100 flex items-center justify-center mb-2 group-hover:shadow-md transition-all duration-200 group-hover:scale-105">

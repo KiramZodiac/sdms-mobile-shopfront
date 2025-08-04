@@ -464,12 +464,30 @@ const Products = () => {
             is_preorder,
             preorder_availability_date,
             condition,
-            categories!inner(slug)
+            categories!inner(id, name, slug)
           `, { count: 'exact' })
           .eq('is_active', true);
 
         if (searchState.category && searchState.category !== 'all') {
-          query = query.eq('categories.slug', searchState.category);
+          console.log('Filtering by category:', searchState.category);
+          // First get the category ID for the given slug
+          const { data: categoryData, error: categoryError } = await supabase
+            .from('categories')
+            .select('id, name, slug')
+            .eq('slug', searchState.category)
+            .eq('is_active', true)
+            .single();
+          
+          if (categoryError) {
+            console.error('Error fetching category:', categoryError);
+          }
+          
+          if (categoryData) {
+            console.log('Found category:', categoryData);
+            query = query.eq('category_id', categoryData.id);
+          } else {
+            console.log('No category found for slug:', searchState.category);
+          }
         }
         if (searchState.searchQuery) {
           query = query.ilike('name', `%${searchState.searchQuery}%`);

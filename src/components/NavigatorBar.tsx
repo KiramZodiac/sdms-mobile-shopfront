@@ -241,7 +241,9 @@ const MobileBottomNavigation = () => {
 
   // Memoized category click handler
   const handleCategoryClick = useCallback((cat) => {
+    console.log('Category clicked:', cat);
     const categoryParam = cat.slug || cat.name;
+    console.log('Navigating to category:', categoryParam);
     navigate(`/products?category=${encodeURIComponent(categoryParam)}`);
   }, [navigate]);
 
