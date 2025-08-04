@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faPhone, 
@@ -11,21 +11,20 @@ import {
   faShoppingCart  
 } from '@fortawesome/free-solid-svg-icons';
 import { faWhatsapp } from '@fortawesome/free-brands-svg-icons';
-import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
 import { CartButton } from './CartButton';
-/**
- * Redesigned Mobile Bottom Navigation Bar for a more visually appealing and professional look.
- * - Modern floating glassmorphism style
- * - Animated active tab indicator
- * - Category drawer with icons and images
- * - Subtle shadow and rounded corners
- * - Large, touch-friendly icons
- */
-
 import clsx from "clsx";
 
 const NAV_HEIGHT = 68;
+
+// Cache for categories data
+const categoriesCache = {
+  data: null,
+  timestamp: 0,
+  loading: false
+};
+
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 const navItems = [
   {
@@ -58,7 +57,23 @@ const navItems = [
   },
 ];
 
-const CategoryDrawer = ({ open, onClose, categories, loading, onCategoryClick }) => (
+interface CategoryDrawerProps {
+  open: boolean;
+  onClose: () => void;
+  categories: Array<{
+    id: string;
+    name: string;
+    slug?: string;
+    image_url?: string;
+    is_active: boolean;
+    count?: number;
+  }>;
+  loading: boolean;
+  onCategoryClick: (cat: any) => void;
+}
+
+// Memoized CategoryDrawer component
+const CategoryDrawer = React.memo(({ open, onClose, categories, loading, onCategoryClick }: CategoryDrawerProps) => (
   <div
     className={clsx(
       "fixed inset-0 z-50 transition-all duration-300",
@@ -69,12 +84,13 @@ const CategoryDrawer = ({ open, onClose, categories, loading, onCategoryClick })
   >
     <div
       className={clsx(
-        "absolute left-0 top-0 h-full w-4/5 max-w-xs bg-white dark:bg-gray-900 shadow-2xl rounded-r-2xl p-5 transition-transform duration-300",
+        "absolute left-0 top-0 h-full w-4/5 max-w-xs bg-white dark:bg-gray-900 shadow-2xl rounded-r-2xl transition-transform duration-300 flex flex-col",
         open ? "translate-x-0" : "-translate-x-full"
       )}
       onClick={e => e.stopPropagation()}
     >
-      <div className="flex items-center justify-between mb-4">
+      {/* Header - Fixed */}
+      <div className="flex items-center justify-between p-5 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
         <span className="text-lg font-semibold text-gray-800 dark:text-gray-100">Categories</span>
         <button
           className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition"
@@ -83,89 +99,171 @@ const CategoryDrawer = ({ open, onClose, categories, loading, onCategoryClick })
           <FontAwesomeIcon icon={faTimes} className="text-gray-500" />
         </button>
       </div>
-      {loading ? (
-        <div className="text-center text-gray-400 py-8">Loading...</div>
-      ) : (
-        <ul className="space-y-3">
-          {categories.map((cat) => (
-            <li key={cat.id}>
-              <button
-                className="flex items-center w-full px-3 py-2 rounded-lg hover:bg-orange-50 dark:hover:bg-gray-800 transition group"
-                onClick={() => {
-                  onCategoryClick(cat);
-                  onClose();
-                }}
-              >
-                {cat.image_url ? (
-                  <img
-                    src={cat.image_url}
-                    alt={cat.name}
-                    className="w-8 h-8 rounded-lg object-cover mr-3 border border-gray-200 dark:border-gray-700"
-                  />
-                ) : (
-                  <FontAwesomeIcon icon={faListAlt} className="w-7 h-7 mr-3 text-orange-400" />
-                )}
-                <span className="text-gray-800 dark:text-gray-100 font-medium flex-1 text-left">
-                  {cat.name}
-                </span>
-                {cat.count > 0 && (
-                  <span className="ml-2 text-xs bg-orange-100 text-orange-600 rounded-full px-2 py-0.5">
-                    {cat.count}
+      
+      {/* Scrollable Content */}
+      <div className="flex-1 overflow-y-auto p-5 -webkit-overflow-scrolling-touch">
+        {loading ? (
+          <div className="text-center text-gray-400 py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto mb-2"></div>
+            Loading categories...
+          </div>
+        ) : (
+          <ul className="space-y-3">
+            {categories.map((cat) => (
+              <li key={cat.id}>
+                <button
+                  className="flex items-center w-full px-3 py-2 rounded-lg hover:bg-orange-50 dark:hover:bg-gray-800 transition group"
+                  onClick={() => {
+                    onCategoryClick(cat);
+                    onClose();
+                  }}
+                >
+                  {cat.image_url ? (
+                    <img
+                      src={cat.image_url}
+                      alt={cat.name}
+                      loading="lazy"
+                      className="w-8 h-8 rounded-lg object-cover mr-3 border border-gray-200 dark:border-gray-700"
+                    />
+                  ) : (
+                    <FontAwesomeIcon icon={faListAlt} className="w-7 h-7 mr-3 text-orange-400" />
+                  )}
+                  <span className="text-gray-800 dark:text-gray-100 font-medium flex-1 text-left">
+                    {cat.name}
                   </span>
-                )}
-                <FontAwesomeIcon icon={faChevronRight} className="ml-2 text-gray-300 group-hover:text-orange-400" />
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+                  {cat.count > 0 && (
+                    <span className="ml-2 text-xs bg-orange-100 text-orange-600 rounded-full px-2 py-0.5">
+                      {cat.count}
+                    </span>
+                  )}
+                  <FontAwesomeIcon icon={faChevronRight} className="ml-2 text-gray-300 group-hover:text-orange-400" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   </div>
-);
+));
+
+CategoryDrawer.displayName = 'CategoryDrawer';
 
 const MobileBottomNavigation = () => {
   const [activeTab, setActiveTab] = useState("home");
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [categories, setCategories] = useState([]);
+  const [categories, setCategories] = useState<Array<{
+    id: string;
+    name: string;
+    slug?: string;
+    image_url?: string;
+    is_active: boolean;
+    count?: number;
+  }>>([]);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const abortControllerRef = useRef<AbortController | null>(null);
 
-  useEffect(() => {
-    const fetchCategories = async () => {
-      setLoading(true);
-      try {
-        const { data, error } = await supabase
-          .from("categories")
-          .select("id, name, image_url, is_active, count");
-        if (error) throw error;
-        setCategories((data || []).filter((c) => c.is_active));
-      } catch (error) {
-        console.error("Error fetching categories:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchCategories();
+  // Check if cache is valid
+  const isCacheValid = useCallback(() => {
+    return categoriesCache.data && 
+           categoriesCache.timestamp && 
+           Date.now() - categoriesCache.timestamp < CACHE_DURATION;
   }, []);
 
-  // Handle navigation and actions
-  const handleNavClick = (item) => {
+  // Fetch categories with caching and optimization
+  const fetchCategories = useCallback(async () => {
+    // Check cache first
+    if (isCacheValid()) {
+      setCategories(categoriesCache.data);
+      setLoading(false);
+      return;
+    }
+
+    // Prevent multiple simultaneous requests
+    if (categoriesCache.loading) return;
+    categoriesCache.loading = true;
+
+    // Cancel previous request if it exists
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    abortControllerRef.current = new AbortController();
+    setLoading(true);
+
+    try {
+      // Dynamic import for Supabase to reduce initial bundle size
+      const { supabase } = await import('@/integrations/supabase/client');
+      
+      const { data, error } = await supabase
+        .from("categories")
+        .select("id, name, slug, image_url, is_active")
+        .eq("is_active", true)
+        .order("name")
+        .abortSignal(abortControllerRef.current.signal);
+
+      if (error) throw error;
+
+      const filteredCategories = data || [];
+      
+      // Update cache
+      categoriesCache.data = filteredCategories;
+      categoriesCache.timestamp = Date.now();
+      
+      setCategories(filteredCategories);
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        return; // Request was cancelled
+      }
+      console.error("Error fetching categories:", error);
+    } finally {
+      setLoading(false);
+      categoriesCache.loading = false;
+      abortControllerRef.current = null;
+    }
+  }, [isCacheValid]);
+
+  // Memoized navigation handler
+  const handleNavClick = useCallback((item) => {
     setActiveTab(item.id);
     if (item.id === "categories") {
       setSidebarOpen(true);
+      document.body.style.overflow = 'hidden';
+      // Fetch categories when drawer opens (lazy loading)
+      fetchCategories();
     } else if (item.link) {
       navigate(item.link);
     } else if (item.action) {
       item.action();
     }
-  };
+  }, [navigate, fetchCategories]);
 
-  // Handle category click
-  const handleCategoryClick = (cat) => {
-    navigate(`/products?category=${encodeURIComponent(cat.name)}`);
-  };
+  // Memoized category click handler
+  const handleCategoryClick = useCallback((cat) => {
+    const categoryParam = cat.slug || cat.name;
+    navigate(`/products?category=${encodeURIComponent(categoryParam)}`);
+  }, [navigate]);
 
-  // Only show on mobile
+  // Memoized drawer close handler
+  const handleDrawerClose = useCallback(() => {
+    setSidebarOpen(false);
+    document.body.style.overflow = '';
+  }, []);
+
+  // Memoized nav items to prevent unnecessary re-renders
+  const memoizedNavItems = useMemo(() => navItems, []);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      document.body.style.overflow = '';
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
+
   return (
     <>
       <nav
@@ -177,7 +275,7 @@ const MobileBottomNavigation = () => {
           boxShadow: "0 -2px 20px 0 rgba(0, 0, 0, 0.1)",
         }}
       >
-        {navItems.map((item, idx) => {
+        {memoizedNavItems.map((item, idx) => {
           // Insert CartButton after categories (index 1)
           if (idx === 1) {
             return (
@@ -269,19 +367,21 @@ const MobileBottomNavigation = () => {
           );
         })}
       </nav>
+      
       {/* Category Drawer */}
       <CategoryDrawer
         open={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
+        onClose={handleDrawerClose}
         categories={categories}
         loading={loading}
         onCategoryClick={handleCategoryClick}
       />
+      
       {/* Spacer for nav height - prevents content from being hidden behind nav */}
       <div className="h-[76px] md:hidden" />
     </>
   );
 };
 
-export default MobileBottomNavigation;
+export default React.memo(MobileBottomNavigation);
 

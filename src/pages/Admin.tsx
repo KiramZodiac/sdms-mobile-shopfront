@@ -21,6 +21,7 @@ import { ProductForm } from "@/components/admin/ProductForm";
 import { CategoryForm } from "@/components/admin/CategoryForm";
 import { BannerForm } from "@/components/admin/BannerForm";
 import { MarqueeForm } from "@/components/admin/MarqueeForm";
+import { PromoBannerList } from "@/components/admin/PromoBannerList";
 
 import { useSimpleAdminAuth } from "@/hooks/useSimpleAdminAuth";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -818,10 +819,11 @@ const Admin = () => {
         </div>
 
         <Tabs defaultValue="products" className="space-y-3 sm:space-y-4">
-          <TabsList className="grid w-full grid-cols-5 h-8 sm:h-10">
+          <TabsList className="grid w-full grid-cols-6 h-8 sm:h-10">
             <TabsTrigger value="products" className="text-xs sm:text-sm">Products</TabsTrigger>
             <TabsTrigger value="categories" className="text-xs sm:text-sm">Categories</TabsTrigger>
             <TabsTrigger value="banners" className="text-xs sm:text-sm">Banners</TabsTrigger>
+            <TabsTrigger value="promo-banners" className="text-xs sm:text-sm">Promo Banners</TabsTrigger>
             <TabsTrigger value="carousel" className="text-xs sm:text-sm">Shop Images</TabsTrigger>
             <TabsTrigger value="marquee" className="text-xs sm:text-sm">Marquee</TabsTrigger>
           </TabsList>
@@ -1259,6 +1261,10 @@ const Admin = () => {
               <h2 className="text-lg sm:text-2xl font-bold">Website Marquee</h2>
             </div>
             <MarqueeForm />
+          </TabsContent>
+
+          <TabsContent value="promo-banners" className="space-y-3 sm:space-y-4">
+            <PromoBannerList />
           </TabsContent>
         </Tabs>
 

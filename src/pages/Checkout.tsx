@@ -18,7 +18,7 @@ const Checkout = () => {
     // lastName: "",
     phone: "",
     // email: "",
-    // address: "",
+    address: "",
     // city: "",
     // district: "",
     notes: ""
@@ -68,7 +68,7 @@ const Checkout = () => {
           phone: customerData.phone,
           // last_name: customerData.lastName,
           // email: customerData.email || null,
-          // address: customerData.address || null,
+           address: customerData.address || null,
           // city: customerData.city || null,
           // district: customerData.district || null,
         }])
@@ -96,6 +96,7 @@ const Checkout = () => {
           payment_method: 'whatsapp',
           status: 'pending',
           notes: customerData.notes || null,
+          address: customerData.address || null,
         }])
         .select()
         .single();
@@ -125,7 +126,7 @@ const Checkout = () => {
         `Phone: ${customerData.phone}`,
         // customerData.lastName && `Last Name: ${customerData.lastName}`,
         // customerData.email && `Email: ${customerData.email}`,
-        // customerData.address && `Address: ${customerData.address}`,
+        customerData.address && `Address: ${customerData.address}`,
         // customerData.city && `City: ${customerData.city}`,
         // customerData.district && `District: ${customerData.district}`
       ].filter(Boolean).join('\n');
@@ -219,6 +220,14 @@ ${customerData.notes ? `Notes: ${customerData.notes}` : ''}`;
                     required
                   />
                 </div>
+                <div>
+                  <Label htmlFor="address">Address (Optional)</Label>
+                  <Input
+                    id="address"
+                    value={customerData.address}
+                    onChange={(e) => handleInputChange('address', e.target.value)}
+                  />
+                </div>
 
                 {/* <div>
                   <Label htmlFor="email">Email (Optional)</Label>
@@ -230,14 +239,7 @@ ${customerData.notes ? `Notes: ${customerData.notes}` : ''}`;
                   />
                 </div>
 
-                <div>
-                  <Label htmlFor="address">Address (Optional)</Label>
-                  <Input
-                    id="address"
-                    value={customerData.address}
-                    onChange={(e) => handleInputChange('address', e.target.value)}
-                  />
-                </div>
+               
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
