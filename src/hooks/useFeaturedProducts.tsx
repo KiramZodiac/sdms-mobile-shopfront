@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import { generateProductRatings } from '@/lib/ratingUtils';
 
 interface Product {
   view_count: number;
@@ -93,17 +94,30 @@ export const useFeaturedProducts = (): UseFeaturedProductsReturn => {
         condition: product.condition,
       })) || [];
 
-      console.log('Transformed products:', { transformedLength: transformedProducts.length, limit });
+      // Generate random ratings for products
+      const ratingsMap = generateProductRatings(transformedProducts);
+      
+      // Apply ratings to products
+      const productsWithRatings = transformedProducts.map(product => {
+        const rating = ratingsMap.get(product.id);
+        return {
+          ...product,
+          rating: rating?.rating || 4.0,
+          reviews_count: rating?.reviews_count || 50,
+        };
+      });
+
+      console.log('Transformed products:', { transformedLength: productsWithRatings.length, limit });
 
       if (offset === 0 || isRefresh) {
-        setProducts(transformedProducts);
+        setProducts(productsWithRatings);
       } else {
-        setProducts(prev => [...prev, ...transformedProducts]);
+        setProducts(prev => [...prev, ...productsWithRatings]);
       }
 
       // Determine if there are more products
-      const newHasMore = transformedProducts.length === limit;
-      console.log('Setting hasMore:', { newHasMore, transformedLength: transformedProducts.length, limit });
+      const newHasMore = productsWithRatings.length === limit;
+      console.log('Setting hasMore:', { newHasMore, transformedLength: productsWithRatings.length, limit });
       setHasMore(newHasMore);
       
     } catch (err: any) {

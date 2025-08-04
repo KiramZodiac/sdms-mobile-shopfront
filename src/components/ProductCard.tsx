@@ -162,11 +162,16 @@ export const ProductCard = memo(
                   />
                 ))}
               </div>
-              {/* {product.reviews_count && product.reviews_count > 0 && (
-                <span className="text-xs text-gray-600">
-                  ({product.reviews_count})
+              {product.rating && (
+                <span className="text-xs text-gray-600 ml-1">
+                  {product.rating.toFixed(1)}
                 </span>
-              )} */}
+              )}
+              {product.reviews_count && product.reviews_count > 0 && (
+                <span className="text-xs text-gray-500">
+                  ({product.reviews_count.toLocaleString()})
+                </span>
+              )}
             </div>
             <div className="mb-1">
   <div className="flex flex-wrap items-center gap-x-2 text-sm font-bold text-gray-900">

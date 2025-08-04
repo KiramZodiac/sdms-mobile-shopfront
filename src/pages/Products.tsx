@@ -9,6 +9,7 @@ import { Pagination, PaginationContent, PaginationItem, PaginationLink, Paginati
 import { useCart } from "@/hooks/useCart";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { generateProductRatings } from "@/lib/ratingUtils";
 
 interface Product {
   id: string;
@@ -571,9 +572,22 @@ const Products = () => {
           condition: product.condition,
         })) || [];
 
+        // Generate random ratings for products
+        const ratingsMap = generateProductRatings(transformedProducts);
+        
+        // Apply ratings to products
+        const productsWithRatings = transformedProducts.map(product => {
+          const rating = ratingsMap.get(product.id);
+          return {
+            ...product,
+            rating: rating?.rating || 4.0,
+            reviews_count: rating?.reviews_count || 50,
+          };
+        });
+
         // Update cache
         cache.products.set(cacheKey, {
-          data: transformedProducts,
+          data: productsWithRatings,
           count: totalAvailable,
           timestamp: Date.now()
         });
@@ -584,7 +598,7 @@ const Products = () => {
           cache.products.delete(firstKey);
         }
 
-        setProducts(transformedProducts);
+        setProducts(productsWithRatings);
         setTotalProducts(totalAvailable);
       } catch (error: any) {
         if (error.name === 'AbortError') return;

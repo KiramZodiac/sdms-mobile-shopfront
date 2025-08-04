@@ -8,6 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useCart } from '@/hooks/useCart';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { getProductRating, generateSingleProductRating } from '@/lib/ratingUtils';
 
 // Lazy load heavy components with preload
 const SpecificationsCard = lazy(() => 
@@ -366,13 +367,19 @@ export default function ProductDetail() {
       if (error) throw error;
 
       if (data) {
+        // Get or generate rating for this product
+        let rating = getProductRating(data.id);
+        if (!rating) {
+          rating = generateSingleProductRating();
+        }
+
         const productData: Product = {
           ...data,
           specifications: typeof data.specifications === 'string' 
             ? JSON.parse(data.specifications) 
             : data.specifications,
-          rating: data.rating || 4.0,
-          reviews_count: data.reviews_count || 0,
+          rating: rating.rating,
+          reviews_count: rating.reviews_count,
           view_count: data.view_count || 0,
           images: data.images || [],
           is_preorder: data.is_preorder || false,

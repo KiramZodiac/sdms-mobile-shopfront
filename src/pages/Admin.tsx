@@ -28,6 +28,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { ErrorBoundary } from "react-error-boundary";
 import { ShopImageCarouselForm } from "@/components/admin/ShopImageCarouselForm";
 import { ShopImageCarouselList } from "@/components/admin/ShopImageCarouselList";
+import RatingStats from "@/components/admin/RatingStats";
 
 // Error Boundary Fallback Component
 const ErrorFallback = ({ error, resetErrorBoundary }) => {
@@ -823,7 +824,7 @@ const Admin = () => {
             className="
               flex flex-wrap w-full gap-1 sm:gap-0
               h-auto sm:h-10
-              justify-start sm:grid sm:grid-cols-6
+              justify-start sm:grid sm:grid-cols-7
               bg-transparent
               p-0
             "
@@ -845,6 +846,9 @@ const Admin = () => {
             </TabsTrigger>
             <TabsTrigger value="marquee" className="flex-1 min-w-[120px] text-xs sm:text-sm h-8 sm:h-10">
               Marquee
+            </TabsTrigger>
+            <TabsTrigger value="ratings" className="flex-1 min-w-[120px] text-xs sm:text-sm h-8 sm:h-10">
+              Ratings
             </TabsTrigger>
           </TabsList>
 
@@ -1281,6 +1285,13 @@ const Admin = () => {
               <h2 className="text-lg sm:text-2xl font-bold">Website Marquee</h2>
             </div>
             <MarqueeForm />
+          </TabsContent>
+
+          <TabsContent value="ratings" className="space-y-3 sm:space-y-4">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+              <h2 className="text-lg sm:text-2xl font-bold">Product Ratings</h2>
+            </div>
+            <RatingStats />
           </TabsContent>
 
           <TabsContent value="promo-banners" className="space-y-3 sm:space-y-4">
