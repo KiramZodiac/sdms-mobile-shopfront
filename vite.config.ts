@@ -18,21 +18,53 @@ export default defineConfig(({ mode }) => ({
       compress: {
         drop_console: mode === 'production',
         drop_debugger: mode === 'production',
+        pure_funcs: mode === 'production' ? ['console.log', 'console.info', 'console.debug'] : [],
+      },
+      mangle: {
+        toplevel: true,
       },
     },
     rollupOptions: {
       output: {
         manualChunks: {
-          vendor: ['react', 'react-dom', 'react-router-dom'],
-          ui: ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-toast'],
-          supabase: ['@supabase/supabase-js'],
-          analytics: ['@vercel/analytics', '@vercel/speed-insights'],
+          // Core React libraries
+          'react-vendor': ['react', 'react-dom'],
+          'router': ['react-router-dom'],
+          
+          // UI libraries - split by usage
+          'ui-core': ['class-variance-authority', 'clsx', 'tailwind-merge'],
+          'ui-basic': ['@radix-ui/react-slot', '@radix-ui/react-label'],
+          'ui-advanced': [
+            '@radix-ui/react-dialog', 
+            '@radix-ui/react-dropdown-menu', 
+            '@radix-ui/react-toast',
+            '@radix-ui/react-tabs',
+            '@radix-ui/react-select',
+            '@radix-ui/react-switch',
+            '@radix-ui/react-tooltip'
+          ],
+          
+          // Data and utilities
+          'supabase': ['@supabase/supabase-js'],
+          'query': ['@tanstack/react-query'],
+          'analytics': ['@vercel/analytics', '@vercel/speed-insights'],
+          
+          // Icons and animations
+          'icons': ['lucide-react', '@fortawesome/fontawesome-svg-core', '@fortawesome/free-brands-svg-icons', '@fortawesome/free-solid-svg-icons', '@fortawesome/react-fontawesome'],
+          'animations': ['framer-motion', 'tailwindcss-animate'],
+          
+          // Forms and validation
+          'forms': ['react-hook-form', '@hookform/resolvers', 'zod'],
+          
+          // Utilities
+          'utils': ['date-fns', 'lodash.debounce', 'cmdk', 'input-otp', 'next-themes', 'react-day-picker', 'react-error-boundary', 'react-resizable-panels', 'recharts', 'sonner', 'vaul'],
         },
       },
     },
     sourcemap: mode === 'development',
     reportCompressedSize: false,
     chunkSizeWarningLimit: 1000,
+    target: 'esnext', // Use modern JavaScript features
   },
   plugins: [
     react(),
@@ -77,6 +109,17 @@ export default defineConfig(({ mode }) => ({
                 statuses: [0, 200]
               }
             }
+          },
+          {
+            urlPattern: /\.(png|jpg|jpeg|gif|svg|webp)$/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'image-cache',
+              expiration: {
+                maxEntries: 50,
+                maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days
+              }
+            }
           }
         ]
       },
@@ -87,4 +130,52 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  // Optimize dependencies
+  optimizeDeps: {
+    include: [
+      'react',
+      'react-dom',
+      'react-router-dom',
+      '@supabase/supabase-js',
+      '@tanstack/react-query',
+      'lucide-react'
+    ],
+    exclude: [
+      // Exclude unused UI components from optimization
+      '@radix-ui/react-accordion',
+      '@radix-ui/react-alert-dialog',
+      '@radix-ui/react-aspect-ratio',
+      '@radix-ui/react-avatar',
+      '@radix-ui/react-checkbox',
+      '@radix-ui/react-collapsible',
+      '@radix-ui/react-context-menu',
+      '@radix-ui/react-hover-card',
+      '@radix-ui/react-menubar',
+      '@radix-ui/react-navigation-menu',
+      '@radix-ui/react-popover',
+      '@radix-ui/react-progress',
+      '@radix-ui/react-radio-group',
+      '@radix-ui/react-scroll-area',
+      '@radix-ui/react-separator',
+      '@radix-ui/react-slider',
+      '@radix-ui/react-toggle',
+      '@radix-ui/react-toggle-group',
+      '@radix-ui/react-sheet',
+      '@radix-ui/react-sidebar',
+      '@radix-ui/react-skeleton',
+      '@radix-ui/react-calendar',
+      '@radix-ui/react-carousel',
+      '@radix-ui/react-command',
+      '@radix-ui/react-form',
+      '@radix-ui/react-resizable',
+      '@radix-ui/react-table',
+      '@radix-ui/react-textarea',
+      '@radix-ui/react-drawer',
+      '@radix-ui/react-breadcrumb',
+      '@radix-ui/react-input-otp',
+      '@radix-ui/react-chart',
+      '@radix-ui/react-alert',
+      '@radix-ui/react-sonner'
+    ]
+  }
 }));
