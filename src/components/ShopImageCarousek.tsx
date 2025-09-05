@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { supabase, ensureConnection } from '@/integrations/supabase/client';
 
 const ShopImageCarousel = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -14,18 +15,25 @@ const ShopImageCarousel = () => {
     async function fetchCarouselImages() {
       setLoading(true);
       try {
-        // Lazy import to avoid import at top
-        const { supabase } = await import('@/integrations/supabase/client');
+        // Ensure Supabase connection is ready
+        const isConnected = await ensureConnection();
+        if (!isConnected) {
+          console.warn('Unable to connect to database, using fallback images');
+          if (isMounted) setLoading(false);
+          return;
+        }
+
         const { data, error } = await supabase
           .from('carousel_images')
           .select('id, image_url, alt_text')
           .eq('is_active', true)
           .order('display_order', { ascending: true });
+        
         if (!error && Array.isArray(data) && isMounted) {
           setCarouselImages(data.filter(img => !!img.image_url));
         }
       } catch (err) {
-        // Optionally handle error
+        console.error('Error fetching carousel images:', err);
       } finally {
         if (isMounted) setLoading(false);
       }

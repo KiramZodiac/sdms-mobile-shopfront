@@ -7,6 +7,8 @@ import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import { ProductCard } from "./ProductCard";
 import { useFeaturedProducts } from "@/hooks/useFeaturedProducts";
+import { useDataInitializer } from "./DataInitializer";
+import { FeaturedProductsSectionSkeleton } from "./SkeletonComponents";
 
 interface Product {
   view_count: number;
@@ -37,6 +39,7 @@ const cardVariants = {
 };
 
 export const FeaturedProducts = () => {
+  const { isInitialized, isConnected } = useDataInitializer();
   const { products, loading, loadingMore, hasMore, loadMore, refresh } = useFeaturedProducts();
   const { addToCart } = useCart();
   const { toast } = useToast();
@@ -84,28 +87,20 @@ export const FeaturedProducts = () => {
     }
   }, []);
 
-  // Memoized loading skeleton
-  const loadingSkeleton = useMemo(() => (
-    <section className="py-8 bg-gradient-to-br from-orange-500/50 to-indigo-900/50">
-      <div className="container mx-auto px-4">
-        <div className="text-center mb-8">
-          <div className="h-6 bg-white/20 rounded w-48 mx-auto mb-4 animate-pulse"></div>
-          <div className="h-4 bg-white/10 rounded w-32 mx-auto animate-pulse"></div>
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-          {[...Array(6)].map((_, i) => (
-            <div
-              key={i}
-              className="bg-white/10 rounded-lg h-64 animate-pulse"
-            ></div>
-          ))}
-        </div>
-      </div>
-    </section>
-  ), []);
+  // Show loading skeleton if data is not initialized or loading
+  if (!isInitialized || loading) {
+    return <FeaturedProductsSectionSkeleton />;
+  }
 
-  if (loading) {
-    return loadingSkeleton;
+  // Show error state if not connected
+  if (!isConnected) {
+    return (
+      <section className="py-8 bg-gradient-to-r from-white/50 to-orange-600/50">
+        <div className="container mx-auto px-4 text-center">
+          <p className="text-gray-600">Unable to load featured products. Please refresh the page.</p>
+        </div>
+      </section>
+    );
   }
 
   return (

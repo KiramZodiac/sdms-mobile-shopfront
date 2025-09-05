@@ -1,59 +1,26 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { useToast } from '@/hooks/use-toast';
-import { generateProductRatings } from '@/lib/ratingUtils';
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useToast } from "@/hooks/use-toast";
+import { supabase, ensureConnection } from "@/integrations/supabase/client";
+import { generateProductRatings } from "@/lib/ratingUtils";
 
-interface Product {
-  view_count: number;
-  id: string;
-  name: string;
-  price: number;
-  original_price?: number;
-  description: string;
-  short_description?: string;
-  images: string[];
-  stock_quantity: number;
-  rating?: number;
-  reviews_count?: number;
-  slug: string;
-  is_preorder: boolean;
-  preorder_availability_date?: string;
-  condition?: 'new' | 'used' | 'like_new' | 'refurbished' | 'open_box';
-  categories?: { name: string; slug: string };
-}
+const INITIAL_LOAD_COUNT = 6;
+const LOAD_MORE_COUNT = 6;
 
-interface UseFeaturedProductsReturn {
-  products: Product[];
-  loading: boolean;
-  loadingMore: boolean;
-  hasMore: boolean;
-  error: string | null;
-  loadMore: () => void;
-  refresh: () => void;
-}
-
-const INITIAL_LOAD_COUNT = 8;
-const LOAD_MORE_COUNT = 8;
-
-export const useFeaturedProducts = (): UseFeaturedProductsReturn => {
-  const [products, setProducts] = useState<Product[]>([]);
+export const useFeaturedProducts = () => {
+  const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState(null);
   const { toast } = useToast();
-  const abortControllerRef = useRef<AbortController | null>(null);
+  
   const isLoadingRef = useRef(false);
+  const abortControllerRef = useRef(null);
 
-  // Fetch featured products
-  const fetchProducts = useCallback(async (limit: number, offset: number, isRefresh = false) => {
+  const fetchProducts = useCallback(async (limit = INITIAL_LOAD_COUNT, offset = 0, isRefresh = false) => {
     // Prevent multiple simultaneous requests
-    if (isLoadingRef.current && !isRefresh) {
-      console.log('Request blocked - already loading');
-      return;
-    }
-    
+    if (isLoadingRef.current && !isRefresh) return;
     isLoadingRef.current = true;
-    console.log('Fetching products:', { limit, offset, isRefresh });
 
     // Cancel previous request if it exists
     if (abortControllerRef.current) {
@@ -64,9 +31,12 @@ export const useFeaturedProducts = (): UseFeaturedProductsReturn => {
     setError(null);
 
     try {
-      // Dynamic import for Supabase to reduce initial bundle size
-      const { supabase } = await import('@/integrations/supabase/client');
-      
+      // Ensure Supabase connection is ready
+      const isConnected = await ensureConnection();
+      if (!isConnected) {
+        throw new Error('Unable to connect to database');
+      }
+
       const { data, error } = await supabase
         .from("products")
         .select(`

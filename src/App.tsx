@@ -5,6 +5,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Routes, Route } from "react-router-dom";
 import { CartProvider } from "@/hooks/useCart";
 import { SimpleAdminAuthProvider } from "@/hooks/useSimpleAdminAuth";
+import { DataInitializerProvider } from "@/components/DataInitializer";
+import { AppLoader } from "@/components/AppLoader";
 import { Layout } from "@/components/Layout";
 import { SimpleProtectedRoute } from "@/components/SimpleProtectedRoute";
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -22,6 +24,8 @@ const queryClient = new QueryClient({
     queries: {
       retry: 1,
       refetchOnWindowFocus: false,
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      gcTime: 10 * 60 * 1000, // 10 minutes (formerly cacheTime)
     },
   },
 });
@@ -30,9 +34,10 @@ const App = () => (
   <ErrorBoundary>
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <SimpleAdminAuthProvider>
-          <CartProvider>
-            
+        <DataInitializerProvider>
+          <AppLoader />
+          <SimpleAdminAuthProvider>
+            <CartProvider>
               <Toaster />
               <Sonner />
               <Routes>
@@ -61,9 +66,9 @@ const App = () => (
                   }
                 />
               </Routes>
-            
-          </CartProvider>
-        </SimpleAdminAuthProvider>
+            </CartProvider>
+          </SimpleAdminAuthProvider>
+        </DataInitializerProvider>
       </TooltipProvider>
     </QueryClientProvider>
   </ErrorBoundary>

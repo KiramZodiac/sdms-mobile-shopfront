@@ -2,51 +2,32 @@
 import { useState, useEffect } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { supabase, ensureConnection } from "@/integrations/supabase/client";
 
 interface BannerSlide {
   id: string;
   title: string;
-  subtitle: string | null;
+  subtitle?: string;
+  description?: string;
   image_url: string;
-  video_url: string | null;
-  cta_text: string | null;
-  cta_link: string | null;
+  cta_text: string;
+  link_url?: string;
   display_order: number;
 }
 
+// Default slides as fallback
 const defaultSlides: BannerSlide[] = [
   {
-    id: "1",
-    title: "Latest iPhone 15 Pro",
-    subtitle: "Experience the future of smartphones with A17 Pro chip",
-    image_url: "https://images.unsplash.com/photo-1556656793-08538906a9f8?w=800",
-    video_url: null,
+    id: "default-1",
+    title: "Welcome to SDM Electronics",
+    subtitle: "Your Trusted Tech Partner",
+    description: "Discover the latest in electronics and technology",
+    image_url: "/banner.mp4",
     cta_text: "Shop Now",
-    cta_link: "/products/?category=smartphones",
-    display_order: 0
+    link_url: "/products",
+    display_order: 1,
   },
-  {
-    id: "2",
-    title: "Gaming Laptops",
-    subtitle: "Unleash your potential with high-performance gaming",
-    image_url: "https://images.unsplash.com/photo-1593642702821-c8da6771f0c6?w=800",
-    video_url: null,
-    cta_text: "Explore",
-    cta_link: "/products?category=laptops",
-    display_order: 1
-  },
-  {
-    id: "3",
-    title: "Premium Audio",
-    subtitle: "Immerse yourself in crystal-clear sound quality",
-    image_url: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800",
-    video_url: null,
-    cta_text: "Listen Now",
-    cta_link: "/products?category=audio",
-    display_order: 2
-  }
 ];
 
 export const HeroBanner = () => {
@@ -71,6 +52,14 @@ export const HeroBanner = () => {
 
   const fetchBanners = async () => {
     try {
+      // Ensure Supabase connection is ready
+      const isConnected = await ensureConnection();
+      if (!isConnected) {
+        console.warn('Unable to connect to database, using default slides');
+        setLoading(false);
+        return;
+      }
+
       const { data, error } = await supabase
         .from('banners')
         .select('*')
@@ -119,10 +108,10 @@ export const HeroBanner = () => {
       >
         {slides.map((slide) => (
           <div key={slide.id} className="w-full h-full flex-shrink-0 relative">
-            {slide.video_url ? (
+            {slide.image_url.includes('.mp4') ? (
               <video
                 className="w-full h-full object-cover"
-                src={slide.video_url}
+                src={slide.image_url}
                 autoPlay
                 muted
                 loop
@@ -146,11 +135,11 @@ export const HeroBanner = () => {
                       {slide.subtitle}
                     </p>
                   )}
-                  {slide.cta_text && slide.cta_link && (
+                  {slide.cta_text && slide.link_url && (
                     <Button 
                       size="lg" 
                       className="bg-orange-500 hover:bg-orange-600 text-white animate-fade-in"
-                      onClick={() => window.location.href = slide.cta_link}
+                      onClick={() => window.location.href = slide.link_url}
                     >
                       {slide.cta_text}
                     </Button>
