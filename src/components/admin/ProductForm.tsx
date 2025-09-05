@@ -252,7 +252,8 @@ export const ProductForm = ({ product, categories, onClose, onSave }: ProductFor
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+   <DialogContent className="max-w-4xl !max-h-[90vh] !overflow-y-auto">
+
         <DialogHeader>
           <DialogTitle>{product ? 'Edit Product' : 'Add New Product'}</DialogTitle>
         </DialogHeader>
