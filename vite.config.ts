@@ -138,7 +138,11 @@ export default defineConfig(({ mode }) => ({
       'react-router-dom',
       '@supabase/supabase-js',
       '@tanstack/react-query',
-      'lucide-react'
+      'lucide-react',
+      'framer-motion',
+      'class-variance-authority',
+      'clsx',
+      'tailwind-merge'
     ],
     exclude: [
       // Exclude unused UI components from optimization

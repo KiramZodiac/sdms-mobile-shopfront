@@ -12,7 +12,8 @@ import {
   Watch
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, ensureConnection } from "@/integrations/supabase/client";
+import { CategoriesGridSkeleton, SectionHeaderSkeleton } from "./SkeletonComponents";
 
 // Icon mapping for categories
 const iconMap = {
@@ -31,10 +32,21 @@ const iconMap = {
 
 export const FeaturedCategories = () => {
   const [categories, setCategories] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchCategories = async () => {
       try {
+        setLoading(true);
+        
+        // Ensure Supabase connection is ready
+        const isConnected = await ensureConnection();
+        if (!isConnected) {
+          console.warn('Unable to connect to database');
+          setLoading(false);
+          return;
+        }
+
         const { data, error } = await supabase
           .from("categories")
           .select("id, name, slug, image_url, is_active, count");
@@ -46,6 +58,8 @@ export const FeaturedCategories = () => {
         setCategories(activeCategories);
       } catch (error) {
         console.error("Error fetching categories:", error);
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -57,6 +71,25 @@ export const FeaturedCategories = () => {
     return iconMap[key] || Monitor; // Default icon
   };
 
+  // Show loading skeleton if loading
+  if (loading) {
+    return (
+      <section className="py-4 bg-gray-50">
+        <SectionHeaderSkeleton />
+        <div className="container mx-auto px-4">
+          <div className="flex overflow-x-auto max-sm:scrollbar-hide w-full space-x-4 pb-2 transition-shadow md:space-x-8 lg:space-x-12">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="flex-shrink-0 flex flex-col items-center">
+                <div className="w-16 h-16 md:w-24 md:h-24 lg:w-28 lg:h-28 bg-gray-200 rounded-2xl animate-pulse mb-2" />
+                <div className="w-16 h-4 bg-gray-200 rounded animate-pulse" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="py-4 bg-gray-50">
       <h2 className="text-2xl font-semibold text-center mb-6">Featured Categories</h2>
@@ -67,7 +100,7 @@ export const FeaturedCategories = () => {
       </div>
       <div className="px-4">
         {/* Horizontal scrollable container */}
-        <div className="flex overflow-x-auto max-sm:scrollbar-hide   w-full  space-x-4 pb-2 transition-shadow   md:space-x-8 lg:space-x-12">
+        <div className="flex overflow-x-auto max-sm:scrollbar-hide w-full space-x-4 pb-2 transition-shadow md:space-x-8 lg:space-x-12">
           {categories.map((category) => {
             const IconComponent = getIconForCategory(category.name);
             
